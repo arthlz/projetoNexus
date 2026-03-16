@@ -35,7 +35,7 @@ Repositório referente ao projeto da disciplina de Desenvolvimento de Software d
 5. Rode o arquivo main.py
    ```bash
      streamlit run main.py
-   ``
+   ```
 
 # Membros participantes: 
 <table align="center">
