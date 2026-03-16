@@ -41,10 +41,22 @@ Repositório referente ao projeto da disciplina de Desenvolvimento de Software d
 <table align="center">
   <tr>
     <td align="center">
+      <a href="https://github.com/allan-f0101">
+        <img src="https://avatars.githubusercontent.com/u/244098995?v=4" width="120px;" alt="Allan Fernandes"/><br>
+        <sub><b>Allan Fernandes</b></sub>
+      </a>
+    </td>
+    <td align="center">
       <a href="https://github.com/arthlz">
         <img src="https://avatars.githubusercontent.com/u/173482833?v=4" width="120px;" alt="Arthur Luz"/><br>
         <sub><b>Arthur Luz</b></sub>
       </a>
+    <td align="center">
+      <a href="https://github.com/ellesamarasllm">
+        <img src="https://avatars.githubusercontent.com/u/200519720?v=4" width="120px;" alt="Elane Lima"/><br>
+        <sub><b>Elane Lima</b></sub>
+      </a>
+    </td>
     </td>
     <td align="center">
       <a href="https://github.com/izabilio">
@@ -53,15 +65,9 @@ Repositório referente ao projeto da disciplina de Desenvolvimento de Software d
       </a>
     </td>
     <td align="center">
-      <a href="https://github.com/ellesamarasllm">
-        <img src="https://avatars.githubusercontent.com/u/200519720?v=4" width="120px;" alt="Elane Lima"/><br>
-        <sub><b>Elane Lima</b></sub>
-      </a>
-    </td>
-    <td align="center">
-      <a href="https://github.com/allan-f0101">
-        <img src="https://avatars.githubusercontent.com/u/244098995?v=4" width="120px;" alt="Allan Fernandes"/><br>
-        <sub><b>Allan Fernandes</b></sub>
+      <a href="https://github.com/kaio-mp3">
+        <img src="https://avatars.githubusercontent.com/u/248941971?v=4" width="120px;" alt="Kaio Vinícius"/><br>
+        <sub><b>Kaio Vinícius</b></sub>
       </a>
     </td>
     <td align="center">
