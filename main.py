@@ -16,7 +16,7 @@ def reiniciarConversa():
 # ======== TESTE DE MEMÓRIA ========
 if __name__ == "__main__":
     gerenciarConversa()
-    curriculo_teste = "Name: Joana. Experience: 2 years in C++ development."
+    curriculo_teste = "Nome: Joana. Experiência: 2 anos de desenvolvimento em Python."
     st.session_state.historico = configurarSystemPrompt("Junior", "Rigoroso", curriculo_teste)
     
     print("--- Entrevista Iniciada (Digite 'sair' para encerrar) ---")
