@@ -1,6 +1,8 @@
-streamlit
 openai
 python-dotenv
 pypdf
 elevenlabs
 httpx
+fastapi
+uvicorn
+python-multipart
