@@ -10,5 +10,5 @@ app.include_router(room_router)
 @app.get("/")
 async def root():
     return {
-        "mensagem": "Este é o Nexus."
+        "message": "Este é o Nexus."
     }

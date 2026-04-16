@@ -46,3 +46,11 @@ class ConfigurarEntrevista(BaseModel):
    company: Optional[str] = Field(None, max_length=50)
    analogy: Optional[str] = Field(None, max_length=100)
    persona: Persona
+
+class ExibirFeedback(BaseModel):
+   score: int
+   tech: int
+   comm: int
+   soft: int
+   feedback: str
+   status: str = "completed"
