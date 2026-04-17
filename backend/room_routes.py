@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from schemas import ConfigurarEntrevista, ExibirFeedback
-from backend.tools import configurar_prompt, resposta_ia, gerar_feedback
+from tools import configurar_prompt, resposta_ia, gerar_feedback
 import uuid
 
 db_temp = {}
