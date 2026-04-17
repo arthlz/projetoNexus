@@ -1,17 +1,23 @@
 from fastapi import APIRouter, HTTPException
 from schemas import ConfigurarEntrevista, ExibirFeedback
 from tools import configurar_prompt, resposta_ia, gerar_feedback
+from datetime import datetime
+from pydantic import BaseModel
 import uuid
 
 db_temp = {}
 room_router = APIRouter(prefix="/room", tags=["room"])
 
-@room_router.post("/setup") # cleanup periódico/timestamp (memória)
+class RespostaCandidato(BaseModel):
+   texto: str
+
+@room_router.post("/setup") # resolvido
 async def configurar_sala(dados: ConfigurarEntrevista):
    room_id = str(uuid.uuid4())
    db_temp[room_id] = {
       "config": dados,
-      "history": []
+      "history": [],
+      "criado_em": datetime.now()
    }
 
    return {
@@ -45,7 +51,7 @@ async def gerar_chat(room_id: str):
       nivel=config.level,
       perfil_recrutador=config.persona,
       idioma=idioma_final,
-      info_candidato="currículo aqui"
+      info_candidato=config.curriculo
    )
     
    try:
@@ -60,6 +66,34 @@ async def gerar_chat(room_id: str):
 
    except Exception as e:
       raise HTTPException(status_code=500, detail=f"Erro na IA: {str(e)}")
+
+@room_router.post("/{room_id}/responder")
+async def responder_pergunta(room_id: str, dados: RespostaCandidato):
+   sala = db_temp.get(room_id)
+   if not sala:
+      raise HTTPException(status_code=404, detail="Sala não encontrada.")
+   
+   sala["history"].append({
+      "role": "user",
+      "content": dados.texto
+   })
+
+   try:
+      proxima_pergunta = await resposta_ia(sala["history"])
+
+      sala["history"].append({
+         "role": "assistent",
+         "content": proxima_pergunta
+      })
+
+      return{
+         "room_id": room_id,
+         "question": proxima_pergunta
+      }
+   
+   except Exception as e:
+      raise HTTPException(status_code=500, detail=f"Erro na IA: {str(e)}")
+
 
 @room_router.post("/{room_id}/encerrar-chat", response_model=ExibirFeedback) # rota incompleta
 async def encerrar_chat(room_id: str):
