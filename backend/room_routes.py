@@ -53,7 +53,12 @@ async def gerar_chat(room_id: str):
       idioma=idioma_final,
       info_candidato=config.curriculo
    )
-    
+   
+   sala["history"].append({
+      "role": "system",
+      "content": system_prompt
+   })
+
    try:
       pergunta = await resposta_ia(system_prompt)
 

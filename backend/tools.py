@@ -35,15 +35,19 @@ def processar_documentos(arquivo_pdf):
         texto += page.extract_text()
     return texto
 
-def resposta_ia(historico_completo):
+async def resposta_ia(historico_completo):
     """Busca uma resposta do modelo de linguagem (LLM) baseada no histórico da conversa"""
-    cliente = configurar_cliente()
-    resposta = cliente.chat.completions.create(
-        model="arcee-ai/trinity-large-preview:free",
-        messages=historico_completo,
-        extra_body={"reasoning": {"enabled": True}}
-    )
-    return resposta.choices[0].message.content
+    try:
+        cliente = configurar_cliente()
+        resposta = await cliente.chat.completions.create(
+            model="arcee-ai/trinity-large-preview:free",
+            messages=historico_completo,
+            extra_body={"reasoning": {"enabled": True}}
+        )
+        return resposta.choices[0].message.content
+    except Exception as e:
+        print(f"Erro ao chamar a OpenAI: {e}")
+        raise e
 
 def configurar_prompt(nivel, perfil_recrutador, info_candidato, idioma):
     """Garante que a IA saiba o nível da vaga, sua personalidade, o contexto do candidato e o idioma no qual a entrevista será conduzida."""
