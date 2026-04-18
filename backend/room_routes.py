@@ -1,17 +1,13 @@
 from fastapi import APIRouter, HTTPException
-from schemas import ConfigurarEntrevista, ExibirFeedback
+from schemas import ConfigurarEntrevista, ExibirFeedback, RespostaCandidato
 from tools import configurar_prompt, resposta_ia, gerar_feedback
 from datetime import datetime
-from pydantic import BaseModel
 import uuid
 
 db_temp = {}
 room_router = APIRouter(prefix="/room", tags=["room"])
 
-class RespostaCandidato(BaseModel):
-   texto: str
-
-@room_router.post("/setup") # resolvido
+@room_router.post("/setup")
 async def configurar_sala(dados: ConfigurarEntrevista):
    room_id = str(uuid.uuid4())
    db_temp[room_id] = {
@@ -27,13 +23,8 @@ async def configurar_sala(dados: ConfigurarEntrevista):
       "config": dados.model_dump()
    }
 
-@room_router.post("/{room_id}/gerar-chat") # adicionar mais um endpoint para a resposta ou refatorar a interação totalmente
+@room_router.post("/{room_id}/gerar-chat") # pensar em como vão ser incorporadas as informações do currículo
 async def gerar_chat(room_id: str):
-   """LIMITAÇÕES ATUAIS:
-   - Gera apenas a primeira pergunta (não mantém conversa)
-   - Não recebe respostas do candidato
-   - Sem contexto de respostas anteriores
-   - Campo hardcoded: info_candidato"""
    sala = db_temp.get(room_id)
     
    if not sala:
@@ -54,15 +45,15 @@ async def gerar_chat(room_id: str):
       info_candidato=config.curriculo
    )
    
-   sala["history"].append({
-      "role": "system",
-      "content": system_prompt
-   })
+   sala["history"] = system_prompt
 
    try:
-      pergunta = await resposta_ia(system_prompt)
+      pergunta = await resposta_ia(sala["history"])
 
-      sala["history"].append({"question": pergunta})
+      sala["history"].append({
+         "role": "assistant",
+         "content": pergunta
+      })
       
       return {
          "room_id": room_id,
@@ -87,7 +78,7 @@ async def responder_pergunta(room_id: str, dados: RespostaCandidato):
       proxima_pergunta = await resposta_ia(sala["history"])
 
       sala["history"].append({
-         "role": "assistent",
+         "role": "assistant",
          "content": proxima_pergunta
       })
 
@@ -100,7 +91,7 @@ async def responder_pergunta(room_id: str, dados: RespostaCandidato):
       raise HTTPException(status_code=500, detail=f"Erro na IA: {str(e)}")
 
 
-@room_router.post("/{room_id}/encerrar-chat", response_model=ExibirFeedback) # rota incompleta
+@room_router.post("/{room_id}/encerrar-chat", response_model=ExibirFeedback) # rota incompleta (adicionar o prompt do feedback)
 async def encerrar_chat(room_id: str):
    sala = db_temp.get(room_id)
    if not sala:
