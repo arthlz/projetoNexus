@@ -4,26 +4,30 @@ from enum import Enum
 
 class Cargo(str, Enum):
    """Opções de cargos disponíveis para a simulação da entrevista."""
-   FRONT_END = "frontend"
-   BACK_END = "backend"
-   FULLSTACK = "fullstack"
+   FRONT_END = "Front-end Developer"
+   BACK_END = "Back-end Developer"
+   FULLSTACK = "Full-stack Developer"
+   MOBILE = "Mobile Developer"
+   DATA_SCIENTIST = "Data Scientist"
 
 class Senioridade(str, Enum):
    """Níveis de experiência aceitos pelo sistema."""
-   JUNIOR = "junior"
-   PLENO = "pleno"
-   SENIOR = "senior"
+   JUNIOR = "Júnior"
+   PLENO = "Pleno"
+   SENIOR = "Sênior"
+   ESPECIALISTA = "Especialista"
 
 class Idioma(str, Enum):
    """Idiomas suportados para a condução da entrevista pela IA."""
    PORTUGUESE = "pt"
    ENGLISH = "en"
 
-class Persona(str, Enum):
+class Persona(str, Enum): # mudança nas personas para alinhar front e back (aguardar)
    """Perfis de personalidade que a IA pode assumir como recrutador."""
-   TECH_LEAD = "tech-lead"
-   ANALYST = "analyst"
-   COACH = "coach"
+   RIGOROSO = "Rigoroso"
+   ACOLHEDOR = "Acolhedor"
+   PROVOCADOR = "Provocador"
+   COMPORTAMENTAL = "Comportamental"
 
 class ConfigurarEntrevista(BaseModel):
    """
@@ -46,6 +50,9 @@ class ConfigurarEntrevista(BaseModel):
    company: Optional[str] = Field(None, max_length=50)
    analogy: Optional[str] = Field(None, max_length=100)
    persona: Persona
+
+class RespostaCandidato(BaseModel):
+   texto: str
 
 class ExibirFeedback(BaseModel):
    score: int
