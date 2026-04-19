@@ -90,7 +90,6 @@ async def responder_pergunta(room_id: str, dados: RespostaCandidato):
    except Exception as e:
       raise HTTPException(status_code=500, detail=f"Erro na IA: {str(e)}")
 
-
 @room_router.post("/{room_id}/encerrar-chat", response_model=ExibirFeedback) # rota incompleta (adicionar o prompt do feedback)
 async def encerrar_chat(room_id: str):
    sala = db_temp.get(room_id)
