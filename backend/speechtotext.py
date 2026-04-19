@@ -1,19 +1,24 @@
-import whisper
+from faster_whisper import WhisperModel
+import time
 
-nome_arquivo = "teste_de_voz.mp3"
+print("Iniciando o Whisper... (O download do modelo compactado ocorrerá agora, apenas na 1ª vez)")
 
-try:
-    print("Carregando a IA na sua máquina...")
-    model = whisper.load_model("large")
+inicio_carregamento = time.time()
 
-    print(f"Lendo o arquivo '{nome_arquivo}' e transcrevendo...")
-    result = model.transcribe(nome_arquivo)
+modelo = WhisperModel("large-v3", device="cpu", compute_type="int8")
 
-    print("\n------RESULTADO FINAL------")
-    print(result["text"])
-    print("---------------------------\n")
+tempo_carregamento = time.time() - inicio_carregamento
+print(f"Modelo carregado na memória em {tempo_carregamento:.2f} segundos.\n")
 
-except FileNotFoundError:
-    print(f"\nArquivo não encontrado")
-except Exception as e:
-    print(f"Ocorreu um erro no local: {e}")
+print("Transcrevendo o áudio...")
+inicio_transcricao = time.time()
+
+segmentos, informacoes = modelo.transcribe("teste_de_voz.mp3", language="pt")
+
+print("\n=== TEXTO RECONHECIDO ===")
+for segmento in segmentos:
+    print(segmento.text)
+print("=========================\n")
+
+tempo_transcricao = time.time() - inicio_transcricao
+print(f"Tempo total de transcrição: {tempo_transcricao:.2f} segundos.")
