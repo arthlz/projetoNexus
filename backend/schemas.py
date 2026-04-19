@@ -40,19 +40,19 @@ class ConfigurarEntrevista(BaseModel):
       role: Cargo pretendido pelo candidato.
       level: Nível de senioridade do candidato.
       language: Idioma em que a entrevista será realizada.
+      persona: Perfil comportamental do entrevistador virtual.
       company: (Opcional) Contexto corporativo para personalização das perguntas.
       analogy: (Opcional) Temática criativa para a construção de perguntas situacionais.
-      persona: Perfil comportamental do entrevistador virtual.
    """
    role: Cargo
    level: Senioridade
    language: Idioma
+   persona: Persona
    company: Optional[str] = Field(None, max_length=50)
    analogy: Optional[str] = Field(None, max_length=100)
-   persona: Persona
 
 class RespostaCandidato(BaseModel):
-   texto: str
+   texto: str = Field(min_length=1, max_length=2000)
 
 class ExibirFeedback(BaseModel):
    score: int

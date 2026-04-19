@@ -1,9 +1,16 @@
 # Para rodar o código, executar no terminal: uvicorn main:app --reload
 from fastapi import FastAPI
+from room_routes import room_router
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
-from room_routes import room_router
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
 
 app.include_router(room_router)
 

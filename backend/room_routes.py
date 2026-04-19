@@ -3,6 +3,7 @@ from schemas import ConfigurarEntrevista, ExibirFeedback, RespostaCandidato
 from tools import configurar_prompt, resposta_ia, gerar_feedback
 from datetime import datetime
 import uuid
+import json
 
 db_temp = {}
 room_router = APIRouter(prefix="/room", tags=["room"])
@@ -23,7 +24,7 @@ async def configurar_sala(dados: ConfigurarEntrevista):
       "config": dados.model_dump()
    }
 
-@room_router.post("/{room_id}/gerar-chat") # pensar em como vão ser incorporadas as informações do currículo
+@room_router.post("/{room_id}/gerar-chat") # incorporar as informações do currículo (sprint 3)
 async def gerar_chat(room_id: str):
    sala = db_temp.get(room_id)
     
@@ -32,19 +33,24 @@ async def gerar_chat(room_id: str):
    
    config = sala["config"]
 
+   if sala["history"]:
+      raise HTTPException(status_code=409, detail="Entrevista já iniciada para esta sala.")
+
    mapa_idiomas = {
       "pt": "Português do Brasil",
       "en": "Inglês Americano"
    }
    idioma_final = mapa_idiomas.get(config.language, "Português do Brasil")
-    
+
    system_prompt = configurar_prompt(
-      nivel=config.level,
-      perfil_recrutador=config.persona,
+      cargo=config.role,
+      senioridade=config.level,
       idioma=idioma_final,
-      info_candidato=config.curriculo
+      perfil_recrutador=config.persona,
+      empresa=config.company,
+      analogia=config.analogy,
    )
-   
+
    sala["history"] = system_prompt
 
    try:
@@ -90,7 +96,7 @@ async def responder_pergunta(room_id: str, dados: RespostaCandidato):
    except Exception as e:
       raise HTTPException(status_code=500, detail=f"Erro na IA: {str(e)}")
 
-@room_router.post("/{room_id}/encerrar-chat", response_model=ExibirFeedback) # rota incompleta (adicionar o prompt do feedback)
+@room_router.post("/{room_id}/encerrar-chat", response_model=ExibirFeedback)
 async def encerrar_chat(room_id: str):
    sala = db_temp.get(room_id)
    if not sala:
@@ -101,9 +107,10 @@ async def encerrar_chat(room_id: str):
    prompt_final = gerar_feedback(current_history)
 
    try:
-      resposta_json = await resposta_ia(prompt_final)
-      
-      return ExibirFeedback(**resposta_json) 
+      resposta_texto = await resposta_ia(prompt_final) # a função retorna uma string
+
+      dados = json.loads(resposta_texto) # transforma em dicionário
+      return ExibirFeedback(**dados) # unpack
 
    except Exception as e:
       raise HTTPException(status_code=500, detail=f"Erro na avaliação: {str(e)}")
