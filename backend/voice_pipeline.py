@@ -16,35 +16,27 @@ Para rodar junto ao FastAPI:
   No main.py, adicione:  app.include_router(voice_router)
 """
 
-import asyncio, os, struct, io, wave
+import asyncio, os, struct, io, wave, time
 import webrtcvad
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from faster_whisper import WhisperModel
+# REMOVIDO: from faster_whisper import WhisperModel (Não precisa mais!)
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
+from deepgram import DeepgramClient, PrerecordedOptions
 
 load_dotenv()
 
 # ── Configurações ──────────────────────────────────────────────────────────────
+SAMPLE_RATE    = 16000   
+FRAME_MS       = 30      
+FRAME_BYTES    = int(SAMPLE_RATE * FRAME_MS / 1000) * 2  
+VAD_AGGRESSIVENESS = 2   
+SILENCE_FRAMES = 20      
 
-SAMPLE_RATE    = 16000   # Hz — obrigatório para Whisper e WebRTC VAD
-FRAME_MS       = 30      # ms por frame (10, 20 ou 30 — limite do webrtcvad)
-FRAME_BYTES    = int(SAMPLE_RATE * FRAME_MS / 1000) * 2  # 16-bit = 2 bytes/sample
-VAD_AGGRESSIVENESS = 2   # 0 (permissivo) a 3 (restrito)
-SILENCE_FRAMES = 20      # frames silenciosos consecutivos antes de transcrever (~600ms)
+# ── Modelos (Singletons) ──────────────────────────────────────────────────────
 
-# ── Modelos (singleton — carregados uma vez na inicialização) ─────────────────
-
-_whisper: WhisperModel | None = None
 _vad: webrtcvad.Vad | None = None
-
-def get_whisper() -> WhisperModel:
-    global _whisper
-    if _whisper is None:
-       
-        # *Trocar por "medium" se precisar de mais acurácia (~0.7s)
-        _whisper = WhisperModel("small", device="cpu", compute_type="int8")
-    return _whisper
+_dg_client: DeepgramClient | None = None
 
 def get_vad() -> webrtcvad.Vad:
     global _vad
@@ -52,24 +44,47 @@ def get_vad() -> webrtcvad.Vad:
         _vad = webrtcvad.Vad(VAD_AGGRESSIVENESS)
     return _vad
 
+def get_deepgram() -> DeepgramClient:
+    global _dg_client
+    if _dg_client is None:
+        _dg_client = DeepgramClient(os.getenv("DEEPGRAM_API_KEY"))
+    return _dg_client
+
 # ── Funções auxiliares ────────────────────────────────────────────────────────
 
 def frames_to_wav(frames: list[bytes]) -> bytes:
-    """Converte lista de frames PCM para bytes WAV em memória."""
     buf = io.BytesIO()
     with wave.open(buf, "wb") as wf:
         wf.setnchannels(1)
-        wf.setsampwidth(2)   # 16-bit
+        wf.setsampwidth(2)
         wf.setframerate(SAMPLE_RATE)
         wf.writeframes(b"".join(frames))
     return buf.getvalue()
 
-def transcrever(frames: list[bytes], language: str = "pt") -> str:
-    """Transcreve áudio PCM usando Whisper small. Retorna texto ou string vazia."""
+# MUDANÇA: Removi o 'async' aqui para funcionar com o to_thread lá embaixo
+def transcrever(frames: list[bytes], language: str = "pt-BR") -> str:
+    """Transcreve usando a API do Deepgram (Nova-2)"""
+    start_time = time.time()
     wav_bytes = frames_to_wav(frames)
-    audio_buf = io.BytesIO(wav_bytes)
-    segments, _ = get_whisper().transcribe(audio_buf, language=language)
-    return " ".join(s.text.strip() for s in segments).strip()
+    dg = get_deepgram()
+    
+    try:
+        options = PrerecordedOptions(
+            model="nova-2",
+            language=language,
+            smart_format=True,
+        )
+        payload = {"buffer": wav_bytes}
+        
+        # Chamada síncrona do SDK v3
+        response = dg.listen.prerecorded.v("1").transcribe_file(payload, options)
+        texto = response.results.channels[0].alternatives[0].transcript
+        
+        print(f"⏱️ [DEEPGRAM] Transcrição em: {time.time() - start_time:.3f}s")
+        return texto.strip()
+    except Exception as e:
+        print(f"❌ Erro Deepgram: {e}")
+        return ""
 
 async def gerar_resposta_streaming(historico: list[dict]) -> asyncio.Queue:
     """Chama o LLM em streaming e empurra tokens em uma fila."""
@@ -81,7 +96,7 @@ async def gerar_resposta_streaming(historico: list[dict]) -> asyncio.Queue:
 
     async def _stream():
         async with client.chat.completions.stream(
-            model="arcee-ai/trinity-large-preview:free",
+            model="z-ai/glm-4.5-air:free",
             messages=historico,
         ) as stream:
             async for chunk in stream:
@@ -101,7 +116,7 @@ async def sintetizar_streaming(text_queue: asyncio.Queue, ws: WebSocket):
     atingir ~80 chars, então chama o TTS e envia o áudio.
     Isso garante que o primeiro chunk de áudio chegue em < 1s.
     """
-    client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))  # TTS via OpenAI
+    client = AsyncOpenAI(api_key=os.getenv("DEEPGRAM_API_KEY"))  # TTS via OpenAI
     buffer = ""
 
     async def _falar(texto: str):
