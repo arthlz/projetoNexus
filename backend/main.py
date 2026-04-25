@@ -2,8 +2,11 @@
 from fastapi import FastAPI
 from room_routes import room_router
 from fastapi.middleware.cors import CORSMiddleware
+from voice_pipeline import voice_router
 
 app = FastAPI()
+
+app.include_router(voice_router)
 
 app.add_middleware(
     CORSMiddleware,

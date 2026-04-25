@@ -87,7 +87,7 @@ def transcrever(frames: list[bytes], language: str = "pt-BR") -> str:
         return ""
 
 async def gerar_resposta_streaming(historico: list[dict]) -> asyncio.Queue:
-    """Chama o LLM em streaming e empurra tokens em uma fila."""
+    """Chama o LLM em streaming e empurra tokens em uma fila (Com proteção contra travamentos)."""
     client = AsyncOpenAI(
         base_url="https://openrouter.ai/api/v1",
         api_key=os.getenv("OPENROUTER_API_KEY"),
@@ -95,15 +95,23 @@ async def gerar_resposta_streaming(historico: list[dict]) -> asyncio.Queue:
     queue: asyncio.Queue[str | None] = asyncio.Queue()
 
     async def _stream():
-        async with client.chat.completions.stream(
-            model="z-ai/glm-4.5-air:free",
-            messages=historico,
-        ) as stream:
-            async for chunk in stream:
-                token = chunk.choices[0].delta.content or ""
-                if token:
-                    await queue.put(token)
-        await queue.put(None)   # sentinela de fim
+        try:
+            async with client.chat.completions.stream(
+                model="z-ai/glm-4.5-air:free",
+                messages=historico,
+            ) as stream:
+                async for chunk in stream:
+                    token = chunk.choices[0].delta.content or ""
+                    if token:
+                        await queue.put(token)
+        except Exception as e:
+            # Se o OpenRouter falhar, avisamos no terminal do Uvicorn
+            print(f"❌ ERRO NO CÉREBRO (OpenRouter): {e}")
+            # Mandamos uma frase de erro para o TTS falar, assim o cliente não trava!
+            await queue.put("Desculpe, tive um problema na minha rede neural.") 
+        finally:
+            # ISSO É O MAIS IMPORTANTE: Sempre avisa que acabou, mesmo se der erro.
+            await queue.put(None)
 
     asyncio.create_task(_stream())
     return queue
@@ -189,17 +197,23 @@ async def voz_endpoint(ws: WebSocket, room_id: str, lang: str = "pt"):
                     speaking = False
 
                     if not texto:
+                        print("⚠️ PASSO 1: Deepgram devolveu texto vazio (áudio ininteligível ou silêncio).")
+                        # Avisa o cliente que não entendeu nada, em vez de deixar ele no vácuo
+                        await ws.send_json({"type": "transcript", "text": "[Áudio sem voz detectada]"})
+                        await ws.send_json({"type": "done"})
                         continue
 
+                    print(f"📍 PASSO 1: Deepgram devolveu: '{texto}'")
                     await ws.send_json({"type": "transcript", "text": texto})
-
-                    # ── Busca histórico da sala (adaptar ao db_temp existente) ─
-                    # Exemplo mínimo — integre com room_routes.db_temp se necessário
+                    
+                    print("📍 PASSO 2: JSON enviado ao site. Acionando a IA...")
                     historico = [{"role": "user", "content": texto}]
-
-                    # ── Gera resposta + TTS em paralelo ─────────────────────
                     text_queue = await gerar_resposta_streaming(historico)
+                    
+                    print("📍 PASSO 3: IA processando! Acionando a Voz (OpenAI)...")
                     await sintetizar_streaming(text_queue, ws)
+                    
+                    print("📍 PASSO 4: Áudio gerado! Encerrando o fluxo.")
                     await ws.send_json({"type": "done"})
 
     except WebSocketDisconnect:
