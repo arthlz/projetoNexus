@@ -4,7 +4,7 @@ import json
 import wave
 
 async def testar_websocket():
-    uri = "ws://localhost:8000/voice/sala-teste?lang=pt"
+    uri = "ws://localhost:8000/voice/sala-teste?lang=en"
     print("🔌 Conectando ao servidor...")
     
     async with websockets.connect(uri) as ws:
