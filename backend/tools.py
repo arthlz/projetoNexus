@@ -1,6 +1,5 @@
 import os
 from openai import AsyncOpenAI
-from pypdf import PdfReader
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -26,14 +25,6 @@ def configurar_cliente():
         base_url="https://openrouter.ai/api/v1",
         api_key=os.getenv("OPENROUTER_API_KEY")
     )
-
-def processar_documentos(arquivo_pdf):
-    """Extrai e retorna todo o texto contido em um arquivo PDF"""
-    leitor = PdfReader(arquivo_pdf)
-    texto = ""
-    for page in leitor.pages:
-        texto += page.extract_text()
-    return texto
 
 async def resposta_ia(historico_atual):
     """Busca uma resposta do modelo de linguagem (LLM) baseada no histórico da conversa"""
@@ -145,3 +136,19 @@ def gerar_feedback(historico_completo: list):
     """
 
     return historico_completo + [{"role": "user", "content": prompt_feedback}]
+
+"""
+refactor: consolidar rotas e remover código morto
+
+- room_routes.py: migrar WebSocket /room/{room_id}/entrevista de
+  voice_pipeline.py para centralizar todas as rotas de sala
+- voice_pipeline.py: remover voice_router e voz_endpoint (movidos),
+  passar histórico completo para gerar_resposta_streaming e retornar
+  texto completo de sintetizar_streaming; corrigir docstrings
+- main.py: remover import do voice_router, reordenar middleware
+- speechtotext-gemini.py: remover print() com chave de API
+- tools.py: remover import PdfReader e função processar_documentos
+- schemas.py: remover RespostaCandidato; adicionar validação de range
+  (ge=0, le=100) nos campos de score em ExibirFeedback
+- requirements.txt: remover 26 pacotes não utilizados (faster-whisper,
+  ctranslate2, pypdf, google-genai, beautifulsoup4, av, etc.)"""

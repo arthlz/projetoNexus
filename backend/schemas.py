@@ -51,13 +51,10 @@ class ConfigurarEntrevista(BaseModel):
    company: Optional[str] = Field(None, max_length=50)
    analogy: Optional[str] = Field(None, max_length=100)
 
-class RespostaCandidato(BaseModel):
-   texto: str = Field(min_length=1, max_length=2000)
-
 class ExibirFeedback(BaseModel):
-   score: int
-   tech: int
-   comm: int
-   soft: int
+   score: int = Field(ge=0, le=100)
+   tech: int = Field(ge=0, le=100)
+   comm: int = Field(ge=0, le=100)
+   soft: int = Field(ge=0, le=100)
    feedback: str
    status: str = "completed"

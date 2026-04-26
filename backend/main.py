@@ -2,11 +2,8 @@
 from fastapi import FastAPI
 from room_routes import room_router
 from fastapi.middleware.cors import CORSMiddleware
-from voice_pipeline import voice_router
 
 app = FastAPI()
-
-app.include_router(voice_router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -15,6 +12,7 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
+# voice_router removido: a rota de voz foi integrada ao room_router.py como /room/{room_id}/entrevista
 app.include_router(room_router)
 
 @app.get("/")

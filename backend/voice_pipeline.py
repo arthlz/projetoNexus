@@ -1,25 +1,25 @@
 """
-Pipeline de voz pro Nexus
+Pipeline de voz para o Nexus
 
 Fluxo:
   1. WebSocket recebe chunks de áudio PCM 16-bit, 16kHz, mono
   2. VAD (webrtcvad) detecta fim de fala e dispara a transcrição
-  3. DeepGram (pré-carregado) transcreve em ~0.3s
+  3. DeepGram transcreve em ~0.3s
   4. LLM gera resposta em streaming
-  5. TTS (OpenAI ou gTTS) converte os primeiros tokens já disponíveis
+  5. TTS via OpenAI converte os primeiros tokens já disponíveis
   6. WebSocket envia chunks de áudio de volta ao cliente
 
 Instalar dependências:
   pip install deepgram-sdk webrtcvad openai python-dotenv
 
 Para rodar junto ao FastAPI:
-  No main.py, adicione:  app.include_router(voice_router)
+  Este módulo é importado por room_routes.py. A rota de voz está
+  registrada como WebSocket em /room/{room_id}/entrevista.
 """
 
-import asyncio, os, struct, io, wave, time
+import asyncio, os, io, wave
 import webrtcvad
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-# REMOVIDO: from faster_whisper import WhisperModel (Não precisa mais!)
+from fastapi import WebSocket
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
 from deepgram import DeepgramClient, PrerecordedOptions
@@ -28,15 +28,20 @@ load_dotenv()
 
 # ── Configurações ──────────────────────────────────────────────────────────────
 class AudioConfig:
-    SAMPLE_RATE    = 16000   
-    FRAME_MS       = 30      
-    FRAME_BYTES    = int(SAMPLE_RATE * FRAME_MS / 1000) * 2  
+    SAMPLE_RATE = 16000   
+    FRAME_MS = 30      
+    FRAME_BYTES = int(SAMPLE_RATE * FRAME_MS / 1000) * 2 # FRAME_BYTES = 960
     VAD_AGGRESSIVENESS = 2   
     SILENCE_FRAMES = 20      
 
-# ── Modelos (Singletons) ──────────────────────────────────────────────────────
+# ── Modelos ────────────────────────────────────────────────────────────────────
 
 class VADDetector:
+    """
+    Detecta início e fim de fala frame a frame, acumulando o áudio falado.
+    Deve ser instanciada uma vez por conexão WebSocket — o estado interno
+    (frames acumulados, contagem de silêncio) é isolado por instância.
+    """
     def __init__(self):
         self.vad = webrtcvad.Vad(AudioConfig.VAD_AGGRESSIVENESS)
         self.speech_frames = []
@@ -76,7 +81,8 @@ class VADDetector:
 
 def transcrever_audio(frames: list[bytes], language: str) -> str:
     """
-    Serviço isolado para o DeepGram.
+    Organiza os frames de áudio no formato WAV e envia ao Deepgram para transcrição.
+    Retorna o texto transcrito ou, em caso de erro, uma string vazia.
     """
     buf = io.BytesIO()
     with wave.open(buf, "wb") as wf:
@@ -95,8 +101,12 @@ def transcrever_audio(frames: list[bytes], language: str) -> str:
         print(f"❌ Erro Deepgram: {e}") 
         return ""
 
-async def gerar_resposta_streaming(texto_usuario: str) -> asyncio.Queue:
-    """Chama o LLM em streaming e empurra tokens em uma fila (Com proteção contra travamentos)."""
+async def gerar_resposta_streaming(historico: list) -> asyncio.Queue:
+    """
+    Chama o LLM em streaming usando o histórico completo da entrevista.
+    Retorna uma fila imediatamente, pois os tokens são empurrados de forma assíncrona conforme chegam,
+    permitindo que o TTS comece antes da resposta terminar.
+    """
     client = AsyncOpenAI(
         base_url="https://openrouter.ai/api/v1",
         api_key=os.getenv("OPENROUTER_API_KEY"),
@@ -107,7 +117,7 @@ async def gerar_resposta_streaming(texto_usuario: str) -> asyncio.Queue:
         try:
             async with client.chat.completions.stream(
                 model="z-ai/glm-4.5-air:free",
-                messages=[{"role": "user", "content": texto_usuario}],
+                messages=historico,
             ) as stream:
                 async for chunk in stream:
                     token = chunk.choices[0].delta.content or ""
@@ -122,19 +132,22 @@ async def gerar_resposta_streaming(texto_usuario: str) -> asyncio.Queue:
     asyncio.create_task(_stream())
     return queue
 
-async def sintetizar_streaming(text_queue: asyncio.Queue, ws: WebSocket):
+async def sintetizar_streaming(text_queue: asyncio.Queue, ws: WebSocket) -> str:
     """
-    Serviço isolado para o TTS (OpenAI).
+    Consome a fila de tokens e os envia ao TTS da OpenAI em trechos,
+    transmitindo o áudio opus ao cliente via WebSocket.
+    Retorna o texto completo da resposta para ser persistido no histórico da sala.
     """
-    client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))  # TTS via OpenAI
-    buffer = ""
+    client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    buffer = "" # Zera toda vez que um trecho é enviado ao TTS
+    full_text = "" # Nunca é zerado, persiste no histórico da sala (importante para o feedback!)
 
     async def _falar(texto: str):
         if not texto.strip(): return
-        
+
         try:
             async with client.audio.speech.with_streaming_response.create(
-                model="tts-1", voice="nova", input=texto, response_format="opus",  # Opus = menor tamanho, ideal para streaming
+                model="tts-1", voice="nova", input=texto, response_format="opus", # Menor tamanho, ideal para streaming
             ) as resp:
                 async for chunk in resp.iter_bytes(chunk_size=4096):
                     await ws.send_bytes(chunk)
@@ -144,44 +157,14 @@ async def sintetizar_streaming(text_queue: asyncio.Queue, ws: WebSocket):
     while True:
         token = await text_queue.get()
         if token is None:
-            await _falar(buffer)  # flush do restante
+            await _falar(buffer) # Envia o restante do buffer ao TTS antes de encerrar
             break
 
         buffer += token
-        # Envia a cada sentença completa ou a cada ~80 chars acumulados
+        full_text += token
+        # Envia o buffer ao TTS a cada sentença completa ou a cada ~80 chars acumulados
         if buffer[-1] in ".!?\n" or len(buffer) >= 80:
             await _falar(buffer)
             buffer = ""
 
-# ── Rota WebSocket ─────────────────────────────────────────────────────────────
-
-voice_router = APIRouter(prefix="/voice", tags=["voice"])
-
-@voice_router.websocket("/{room_id}")
-async def voz_endpoint(ws: WebSocket, room_id: str, lang: str = "en"):
-    await ws.accept()
-    detector_vad = VADDetector()
-
-    try:
-        while True:
-            frame = await ws.receive_bytes()
-            audio_completo = detector_vad.process_frame(frame)
-
-            # Valida tamanho do frame (webrtcvad é rígido quanto a isso)
-            if audio_completo:
-                texto = await asyncio.to_thread(transcrever_audio, audio_completo, lang)
-                
-                if not texto:
-                    await ws.send_json({"type": "transcript", "text": "[Áudio não compreendido]"})
-                    await ws.send_json({"type": "done"})
-                    continue
-                
-                await ws.send_json({"type": "transcript", "text": texto})
-
-                text_queue = await gerar_resposta_streaming(texto)
-                await sintetizar_streaming(text_queue, ws)
-
-                await ws.send_json({"type": "done"})
-
-    except WebSocketDisconnect:
-        print("🔌 Cliente desconectado.")
+    return full_text
