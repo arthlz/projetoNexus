@@ -12,6 +12,7 @@ import { HistoryScreen } from "@/components/ui/screens/history-screen"
 import { ReportScreen } from "@/components/ui/screens/report-screen"
 import { ResumeScreen } from "@/components/ui/screens/resume-screen"
 import { ProfileScreen } from "@/components/ui/screens/profile-screen"
+import { RegisterScreen } from "@/components/ui/screens/register-screen"
 
 export default function NexusApp() {
   const [currentScreen, setCurrentScreen] = useState<Screen>("login")
@@ -52,6 +53,10 @@ export default function NexusApp() {
   if (currentScreen === "login") {
     return <LoginScreen navigateTo={navigateTo} />
   }
+
+  if (currentScreen === "register") {
+  return <RegisterScreen navigateTo={navigateTo} />
+}
 
   //Tela de ligação (Ocupa a tela inteira, sem o Layout da Sidebar)
   if (currentScreen === "call") {
