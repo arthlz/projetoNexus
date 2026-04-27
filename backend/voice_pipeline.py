@@ -26,7 +26,17 @@ from deepgram import DeepgramClient, PrerecordedOptions
 
 load_dotenv()
 
+# ── Singletons (os clientes HTTP são instanciados apenas uma vez) ──────────────
+
+_dg_client = DeepgramClient(os.getenv("DEEPGRAM_API_KEY"))
+_llm_client = AsyncOpenAI(
+    base_url="https://openrouter.ai/api/v1",
+    api_key=os.getenv("OPENROUTER_API_KEY"),
+)
+_tts_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
 # ── Configurações ──────────────────────────────────────────────────────────────
+
 class AudioConfig:
     SAMPLE_RATE = 16000   
     FRAME_MS = 30      
@@ -92,9 +102,8 @@ def transcrever_audio(frames: list[bytes], language: str) -> str:
         wf.writeframes(b"".join(frames))
 
     try:
-        dg_client = DeepgramClient(os.getenv("DEEPGRAM_API_KEY"))
         options = PrerecordedOptions(model="nova-2", language=language, smart_format=True)
-        response = dg_client.listen.prerecorded.v("1").transcribe_file({"buffer": buf.getvalue()}, options)
+        response = _dg_client.listen.prerecorded.v("1").transcribe_file({"buffer": buf.getvalue()}, options)
         return response.results.channels[0].alternatives[0].transcript.strip()
     
     except Exception as e:
@@ -107,15 +116,11 @@ async def gerar_resposta_streaming(historico: list) -> asyncio.Queue:
     Retorna uma fila imediatamente, pois os tokens são empurrados de forma assíncrona conforme chegam,
     permitindo que o TTS comece antes da resposta terminar.
     """
-    client = AsyncOpenAI(
-        base_url="https://openrouter.ai/api/v1",
-        api_key=os.getenv("OPENROUTER_API_KEY"),
-    )
     queue = asyncio.Queue()
 
     async def _stream():
         try:
-            async with client.chat.completions.stream(
+            async with _llm_client.chat.completions.stream(
                 model="z-ai/glm-4.5-air:free",
                 messages=historico,
             ) as stream:
@@ -138,7 +143,6 @@ async def sintetizar_streaming(text_queue: asyncio.Queue, ws: WebSocket) -> str:
     transmitindo o áudio opus ao cliente via WebSocket.
     Retorna o texto completo da resposta para ser persistido no histórico da sala.
     """
-    client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     buffer = "" # Zera toda vez que um trecho é enviado ao TTS
     full_text = "" # Nunca é zerado, persiste no histórico da sala (importante para o feedback!)
 
@@ -146,7 +150,7 @@ async def sintetizar_streaming(text_queue: asyncio.Queue, ws: WebSocket) -> str:
         if not texto.strip(): return
 
         try:
-            async with client.audio.speech.with_streaming_response.create(
+            async with _tts_client.audio.speech.with_streaming_response.create(
                 model="tts-1", voice="nova", input=texto, response_format="opus", # Menor tamanho, ideal para streaming
             ) as resp:
                 async for chunk in resp.iter_bytes(chunk_size=4096):

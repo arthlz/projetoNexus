@@ -20,18 +20,16 @@ PERSONALIDADES = {
     )
 }
 
-def configurar_cliente():
-    return AsyncOpenAI(
-        base_url="https://openrouter.ai/api/v1",
-        api_key=os.getenv("OPENROUTER_API_KEY")
-    )
+_cliente = AsyncOpenAI(
+    base_url="https://openrouter.ai/api/v1",
+    api_key=os.getenv("OPENROUTER_API_KEY")
+)
 
 async def resposta_ia(historico_atual):
     """Busca uma resposta do modelo de linguagem (LLM) baseada no histórico da conversa"""
     try:
-        cliente = configurar_cliente()
         # Se o trinity estiver indisponível, considerar: arcee-ai/arcee-blitz ou google/gemini-2.0-flash-thinking-exp:free
-        resposta = await cliente.chat.completions.create(
+        resposta = await _cliente.chat.completions.create(
             model="arcee-ai/trinity-large-preview:free", # Modelo com raciocínio estendido, mais adequado para gerar feedback criterioso
             messages=historico_atual,
             extra_body={"reasoning": {"enabled": True}}
