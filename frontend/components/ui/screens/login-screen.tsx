@@ -50,7 +50,12 @@ export const LoginScreen = ({ navigateTo }: LoginScreenProps) => {
             </Button>
           </div>
           <p className="text-center text-slate-400 text-sm mt-6">
-            Não tem conta? <button className="text-cyan-400 hover:text-cyan-300 font-medium">Cadastre-se</button>
+            Não tem conta? <button
+            onClick={() => navigateTo("register")}
+            className="text-cyan-400 hover:text-cyan-300 font-medium"
+                >
+                  Cadastre-se
+                    </button>
           </p>
         </div>
       </div>

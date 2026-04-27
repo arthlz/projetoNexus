@@ -1,5 +1,6 @@
 export type Screen = 
   | "login" 
+  | "register"
   | "dashboard" 
   | "setup" 
   | "resume" 
