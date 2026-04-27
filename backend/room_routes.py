@@ -5,6 +5,7 @@ from voice_pipeline import VADDetector, transcrever_audio, gerar_resposta_stream
 from datetime import datetime
 import uuid
 import json
+import re
 import asyncio
 
 db_temp = {}
@@ -27,13 +28,13 @@ async def configurar_sala(dados: ConfigurarEntrevista):
    }
 
 @room_router.websocket("/{room_id}/entrevista")
-async def entrevista(ws: WebSocket, room_id: str):
+async def iniciar_entrevista(ws: WebSocket, room_id: str):
+   await ws.accept()
+
    sala = db_temp.get(room_id)
    if not sala:
       await ws.close(code=4004)
       return
-
-   await ws.accept()
 
    config = sala["config"]
 
@@ -86,8 +87,8 @@ async def entrevista(ws: WebSocket, room_id: str):
       print("🔌 Cliente desconectado.")
 
 
-@room_router.post("/{room_id}/encerrar-chat", response_model=ExibirFeedback)
-async def encerrar_chat(room_id: str):
+@room_router.post("/{room_id}/encerrar", response_model=ExibirFeedback)
+async def encerrar_entrevista(room_id: str):
    sala = db_temp.get(room_id)
    if not sala:
       raise HTTPException(status_code=404, detail="Sala não encontrada.")
@@ -97,10 +98,23 @@ async def encerrar_chat(room_id: str):
    prompt_final = gerar_feedback(current_history)
 
    try:
-      resposta_texto = await resposta_ia(prompt_final) # a função retorna uma string
+      # Envia o histórico ao LLM e recebe o feedback como texto puro (string 'suja')
+      resposta_texto = await resposta_ia(prompt_final)
 
-      dados = json.loads(resposta_texto) # transforma em dicionário
-      return ExibirFeedback(**dados) # unpack
+      # Extrai o objeto JSON da resposta (string 'limpa'), ignorando texto extra ou blocos de markdown
+      match = re.search(r'\{.*\}', resposta_texto, re.DOTALL)
+      if not match:
+         raise ValueError("Nenhum JSON encontrado na resposta do modelo.")
+
+      # Converte o JSON extraído em dicionário Python
+      dados = json.loads(match.group())
+
+      # Valida os dados contra o schema (scores entre 0-100, campos obrigatórios, etc)
+      feedback = ExibirFeedback(**dados)
+
+      # Só deleta a sala após tudo ter dado certo (se falhar, o usuário pode tentar de novo)
+      db_temp.pop(room_id)
+      return feedback
 
    except Exception as e:
       raise HTTPException(status_code=500, detail=f"Erro na avaliação: {str(e)}")
