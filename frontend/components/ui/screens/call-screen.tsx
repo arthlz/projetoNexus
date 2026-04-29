@@ -4,8 +4,10 @@ import { useState, useEffect } from "react"
 import { Mic, MicOff, Pause, Paperclip, Brain, Upload, FileText, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { useVoiceCall } from "@/components/ui/useVoiceCall"
 
 interface CallScreenProps {
+  roomId: string // <--- Adicionado para conectar com a sala criada no backend
   isMuted: boolean
   setIsMuted: (val: boolean) => void
   isPaused: boolean
@@ -13,11 +15,34 @@ interface CallScreenProps {
   onEnd: () => void
 }
 
-export const CallScreen = ({ isMuted, setIsMuted, isPaused, setIsPaused, onEnd }: CallScreenProps) => {
+export const CallScreen = ({ roomId, isMuted, setIsMuted, isPaused, setIsPaused, onEnd }: CallScreenProps) => {
+  // Inicializa o hook passando o ID da sala para a URL do WebSocket
+  const { startCall, stopCall, toggleMuteAudio, togglePauseAudio } = useVoiceCall(roomId)
+
   // Estados locais para gerenciar o PDF e o Timer dentro da própria tela
   const [callTime, setCallTime] = useState(0)
   const [codeDialogOpen, setCodeDialogOpen] = useState(false)
   const [pdfCallName, setPdfCallName] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (roomId) {
+      startCall()
+    }
+    return () => stopCall()
+  }, [roomId])
+
+  useEffect(() => {
+    toggleMuteAudio(isMuted)
+  }, [isMuted])
+
+  useEffect(() => {
+    togglePauseAudio(isPaused)
+  }, [isPaused])
+
+  const handleEndCall = () => {
+    stopCall()
+    onEnd()
+  }
 
   // Lógica do Timer restaurada
   useEffect(() => {
@@ -152,7 +177,7 @@ export const CallScreen = ({ isMuted, setIsMuted, isPaused, setIsPaused, onEnd }
           </Dialog>
 
           <Button
-            onClick={onEnd}
+            onClick={handleEndCall}
             className="px-6 h-12 rounded-full bg-red-500 hover:bg-red-600 text-white font-medium"
           >
             Encerrar

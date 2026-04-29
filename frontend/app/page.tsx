@@ -21,6 +21,9 @@ export default function NexusApp() {
   const [isMuted, setIsMuted] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
   const [language, setLanguage] = useState<"pt" | "en">("pt")
+  
+  // NOVO: Estado para armazenar o ID da sala gerado pelo back-end
+  const [roomId, setRoomId] = useState<string>("") 
 
   //Função para navegar entre as telas
   const navigateTo = (screen: Screen) => {
@@ -55,13 +58,14 @@ export default function NexusApp() {
   }
 
   if (currentScreen === "register") {
-  return <RegisterScreen navigateTo={navigateTo} />
-}
+    return <RegisterScreen navigateTo={navigateTo} />
+  }
 
   //Tela de ligação (Ocupa a tela inteira, sem o Layout da Sidebar)
   if (currentScreen === "call") {
     return (
       <CallScreen 
+        roomId={roomId} // <-- NOVO: Passando o ID da sala para a CallScreen
         isMuted={isMuted}
         setIsMuted={setIsMuted}
         isPaused={isPaused}
@@ -101,7 +105,11 @@ export default function NexusApp() {
         <SetupScreen 
           language={language} 
           setLanguage={setLanguage} 
-          onStart={() => navigateTo("call")} 
+          // NOVO: Agora o onStart recebe o ID que vem do back-end, salva no state e muda a tela
+          onStart={(newRoomId: string) => {
+            setRoomId(newRoomId)
+            navigateTo("call")
+          }} 
         />
       </Layout>
     )

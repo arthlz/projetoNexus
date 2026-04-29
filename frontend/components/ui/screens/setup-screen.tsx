@@ -1,15 +1,63 @@
 "use client"
 
-import { Play } from "lucide-react"
+import { useState } from "react"
+import { Play, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 interface SetupScreenProps {
   language: "pt" | "en"
   setLanguage: (lang: "pt" | "en") => void
-  onStart: () => void
+  onStart: (roomId: string) => void
 }
 
 export const SetupScreen = ({ language, setLanguage, onStart }: SetupScreenProps) => {
+  const [role, setRole] = useState("Front-end Developer")
+  const [level, setLevel] = useState("Pleno")
+  const [company, setCompany] = useState("")
+  const [analogy, setAnalogy] = useState("")
+  const [persona, setPersona] = useState("Rigoroso")
+  const [isLoading, setIsLoading] = useState(false)
+
+  const handleStartInterview = async () => {
+    setIsLoading(true)
+    try {
+      const response = await fetch("http://localhost:8000/room/setup", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          role,
+          level,
+          language,
+          persona,
+          company: company.trim() !== "" ? company : null,
+          analogy: analogy.trim() !== "" ? analogy : null,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Erro ao configurar a sala")
+      }
+
+      const data = await response.json()
+      
+      if (data.status === "success" && data.room_id) {
+        onStart(data.room_id)
+      }
+    } catch (error) {
+      console.warn("Backend não encontrado. Entrando em modo Mock.", error)
+      
+      // MODO MOCK: Gera um ID falso e avisa o usuário
+      const mockRoomId = `mock-${Math.random().toString(36).substring(7)}`
+      alert("⚠️ Backend offline! Entrando no Modo Simulação (apenas interface). A IA não vai responder.")
+      
+      onStart(mockRoomId)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   return (
     <div className="max-w-3xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       
@@ -26,7 +74,11 @@ export const SetupScreen = ({ language, setLanguage, onStart }: SetupScreenProps
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
             <label className="text-sm font-medium text-slate-900">Cargo</label>
-            <select className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all cursor-pointer">
+            <select 
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all cursor-pointer"
+            >
               <option value="Front-end Developer">Front-end Developer</option>
               <option value="Back-end Developer">Back-end Developer</option>
               <option value="Full-stack Developer">Full-stack Developer</option>
@@ -36,9 +88,13 @@ export const SetupScreen = ({ language, setLanguage, onStart }: SetupScreenProps
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium text-slate-900">Nível</label>
-            <select className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all cursor-pointer">
+            <select 
+              value={level}
+              onChange={(e) => setLevel(e.target.value)}
+              className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all cursor-pointer"
+            >
               <option value="Júnior">Júnior</option>
-              <option value="Pleno" defaultValue="Pleno">Pleno</option>
+              <option value="Pleno">Pleno</option>
               <option value="Sênior">Sênior</option>
               <option value="Especialista">Especialista</option>
             </select>
@@ -79,6 +135,8 @@ export const SetupScreen = ({ language, setLanguage, onStart }: SetupScreenProps
           <label className="text-sm font-medium text-slate-900">Empresa Alvo (opcional)</label>
           <input
             type="text"
+            value={company}
+            onChange={(e) => setCompany(e.target.value)}
             placeholder="Ex: Google, Nubank, iFood..."
             className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all"
           />
@@ -89,6 +147,8 @@ export const SetupScreen = ({ language, setLanguage, onStart }: SetupScreenProps
           <label className="text-sm font-medium text-slate-900">Tema de Analogia (opcional)</label>
           <input
             type="text"
+            value={analogy}
+            onChange={(e) => setAnalogy(e.target.value)}
             placeholder="Ex: Futebol, Música, Culinária..."
             className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all"
           />
@@ -97,7 +157,11 @@ export const SetupScreen = ({ language, setLanguage, onStart }: SetupScreenProps
         {/* Persona do Entrevistador */}
         <div className="space-y-2">
           <label className="text-sm font-medium text-slate-900">Persona do Entrevistador</label>
-          <select className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all cursor-pointer">
+          <select 
+            value={persona}
+            onChange={(e) => setPersona(e.target.value)}
+            className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all cursor-pointer"
+          >
             <option value="Rigoroso">Rigoroso (Arquiteto Técnico Sênior)</option>
             <option value="Acolhedor">Acolhedor (Gerente de Engenharia)</option>
             <option value="Provocador">Provocador (Tech Lead Cético)</option>
@@ -108,11 +172,16 @@ export const SetupScreen = ({ language, setLanguage, onStart }: SetupScreenProps
         {/* Botão de Ação */}
         <div className="pt-4">
           <Button
-            onClick={onStart}
-            className="w-full h-14 text-lg bg-cyan-500 hover:bg-cyan-600 text-white font-bold rounded-xl shadow-lg shadow-cyan-500/25 transition-all flex items-center justify-center gap-2"
+            onClick={handleStartInterview}
+            disabled={isLoading}
+            className="w-full h-14 text-lg bg-cyan-500 hover:bg-cyan-600 text-white font-bold rounded-xl shadow-lg shadow-cyan-500/25 transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
           >
-            <Play className="w-5 h-5 fill-current" />
-            Entrar na Sala
+            {isLoading ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <Play className="w-5 h-5 fill-current" />
+            )}
+            {isLoading ? "Configurando Sala..." : "Entrar na Sala"}
           </Button>
         </div>
 
