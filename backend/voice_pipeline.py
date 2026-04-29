@@ -34,7 +34,6 @@ _llm_client = AsyncOpenAI(
     base_url="https://openrouter.ai/api/v1",
     api_key=os.getenv("OPENROUTER_API_KEY"),
 )
-_tts_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # ── Configurações ──────────────────────────────────────────────────────────────
 
@@ -105,7 +104,11 @@ def transcrever_audio(frames: list[bytes], language: str) -> str:
     try:
         options = PrerecordedOptions(model="nova-2", language="pt-BR", smart_format=True)
         response = _dg_client.listen.prerecorded.v("1").transcribe_file({"buffer": buf.getvalue()}, options)
-        return response.results.channels[0].alternatives[0].transcript.strip()
+        texto = response.results.channels[0].alternatives[0].transcript.strip()
+
+        print(f"O que o DeepGram ouviu {texto}")
+
+        return 
     
     except Exception as e:
         print(f"❌ Erro Deepgram: {e}") 
