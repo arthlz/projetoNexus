@@ -24,7 +24,7 @@ export function useVoiceCall(roomId: string | null) {
       }
 
       // Se for Binário, é o áudio em Streaming do OpenAI TTS
-      const audioBlob = new Blob([event.data], { type: 'audio/ogg' });
+      const audioBlob = new Blob([event.data], { type: 'audio/mpeg' });
       const audioUrl = URL.createObjectURL(audioBlob);
       const audio = new Audio(audioUrl);
       await audio.play();
@@ -83,10 +83,24 @@ export function useVoiceCall(roomId: string | null) {
     }
   };
 
-  const stopCall = () => {
-    if (processorRef.current && audioContextRef.current) {
+  const stopCall = async () => {
+    if (processorRef.current){
       processorRef.current.disconnect();
-      audioContextRef.current.close();
+      processorRef.current = null;
+    }
+
+    if (audioContextRef.current){
+      const ctx = audioContextRef.current;
+
+      audioContextRef.current = null;
+
+      try{
+        if(ctx.state !== "closed"){
+          await ctx.close();
+        }
+      }catch(e){
+        console.warn("AudioContext já estava encerrado ou em transição.")
+      }
     }
     streamRef.current?.getTracks().forEach(track => track.stop());
     setIsCalling(false);

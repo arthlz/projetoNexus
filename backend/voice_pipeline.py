@@ -19,6 +19,7 @@ Para rodar junto ao FastAPI:
 
 import asyncio, os, io, wave
 import webrtcvad
+import edge_tts
 from fastapi import WebSocket
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
@@ -102,7 +103,7 @@ def transcrever_audio(frames: list[bytes], language: str) -> str:
         wf.writeframes(b"".join(frames))
 
     try:
-        options = PrerecordedOptions(model="nova-2", language=language, smart_format=True)
+        options = PrerecordedOptions(model="nova-2", language="pt-BR", smart_format=True)
         response = _dg_client.listen.prerecorded.v("1").transcribe_file({"buffer": buf.getvalue()}, options)
         return response.results.channels[0].alternatives[0].transcript.strip()
     
@@ -118,16 +119,31 @@ async def gerar_resposta_streaming(historico: list) -> asyncio.Queue:
     """
     queue = asyncio.Queue()
 
+    historico_valido = [
+        m for m in historico
+        if m.get("content") and str(m["content"]).strip() != ""
+    ]
+
+    if not historico_valido:
+        print("⚠️ Histórico vazio ou mensagem inválida. Abortando chamada.")
+        await queue.put("Desculpe, não consegui ouvir nada. Pode repetir?")
+        await queue.put(None)
+        return queue
+
     async def _stream():
         try:
+            print("================ DEBUG HISTORICO ================")
+            print(historico_valido)
+            print("=================================================")
             async with _llm_client.chat.completions.stream(
-                model="z-ai/glm-4.5-air:free",
-                messages=historico,
+                model="minimax/minimax-m2.5:free",
+                messages=historico_valido,
             ) as stream:
                 async for chunk in stream:
-                    token = chunk.choices[0].delta.content or ""
-                    if token:
-                        await queue.put(token)
+                    if hasattr(chunk, "choices") and len(chunk.choices) > 0:
+                        token = chunk.choices[0].delta.content or ""
+                        if token:
+                            await queue.put(token)
         except Exception as e:
             print(f"❌ ERRO NO CÉREBRO (OpenRouter): {e}")
             await queue.put("Falha no processamento lógico.") 
@@ -150,11 +166,11 @@ async def sintetizar_streaming(text_queue: asyncio.Queue, ws: WebSocket) -> str:
         if not texto.strip(): return
 
         try:
-            async with _tts_client.audio.speech.with_streaming_response.create(
-                model="tts-1", voice="nova", input=texto, response_format="opus", # Menor tamanho, ideal para streaming
-            ) as resp:
-                async for chunk in resp.iter_bytes(chunk_size=4096):
-                    await ws.send_bytes(chunk)
+
+            communicate = edge_tts.Communicate(texto, "pt-BR-FranciscaNeural")
+            async for chunk in communicate.stream():
+                if chunk["type"] == "audio":
+                    await ws.send_bytes(chunk["data"])
         except Exception as e:
             print(f"❌ Erro OpenAI TTS: {e}")
 
