@@ -1,13 +1,9 @@
 import { createClient } from "@supabase/supabase-js"
 
-const supabaseUrl = "https://loyityouqpkzqhtkqjov.supabase.co"
-const supabaseKey = "sb_publishable_p7o-AfgOFQhHn3s7xiVG1Q_pIgzyzR8"
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-export const supabase = createClient(supabaseUrl, supabaseKey, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    // Para desenvolvimento, vamos confirmar automaticamente os emails
-    // Isso só funciona se você tiver permissões de admin no Supabase
-  }
-})
+export const supabase = createClient(
+  supabaseUrl,
+  supabaseKey
+)
