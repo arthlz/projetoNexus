@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from schemas import ConfigurarEntrevista, ExibirFeedback
 from tools import configurar_prompt, resposta_ia, gerar_feedback
-from voice_pipeline import VADDetector, transcrever_audio, gerar_resposta_streaming, sintetizar_streaming
+from voice_pipeline import VADDetector, transcrever_audio, handle_voice
 from datetime import datetime
 import uuid
 import json
@@ -52,9 +52,9 @@ async def iniciar_entrevista(ws: WebSocket, room_id: str):
       )
 
       # IA abre a entrevista antes do usuário falar
-      text_queue = await gerar_resposta_streaming(sala["history"])
-      abertura = await sintetizar_streaming(text_queue, ws)
-      sala["history"].append({"role": "assistant", "content": abertura})
+      # text_queue = await gerar_resposta_streaming(sala["history"])
+      # abertura = await sintetizar_streaming(text_queue, ws)
+      # sala["history"].append({"role": "assistant", "content": abertura})
       await ws.send_json({"type": "done"})
 
    detector_vad = VADDetector()
@@ -66,7 +66,7 @@ async def iniciar_entrevista(ws: WebSocket, room_id: str):
 
          # Valida tamanho do frame (webrtcvad é rígido quanto a isso)
          if audio_completo:
-            texto = await asyncio.to_thread(transcrever_audio, audio_completo, config.language)
+            texto = await asyncio.to_thread(transcrever_audio, audio_completo)
 
             if not texto:
                await ws.send_json({"type": "transcript", "text": "[Áudio não compreendido]"})
@@ -75,11 +75,10 @@ async def iniciar_entrevista(ws: WebSocket, room_id: str):
 
             await ws.send_json({"type": "transcript", "text": texto})
 
-            sala["history"].append({"role": "user", "content": texto})
-
-            text_queue = await gerar_resposta_streaming(sala["history"])
-            resposta = await sintetizar_streaming(text_queue, ws)
-            sala["history"].append({"role": "assistant", "content": resposta})
+            # sala["history"].append({"role": "user", "content": texto})
+            # text_queue = await gerar_resposta_streaming(sala["history"])
+            # resposta = await sintetizar_streaming(text_queue, ws)
+            # sala["history"].append({"role": "assistant", "content": resposta})
 
             await ws.send_json({"type": "done"})
 
