@@ -32,9 +32,14 @@ Repositório referente ao projeto da disciplina de Desenvolvimento de Software d
    pip install -r requirements.txt
    ```
    
-5. Rode o arquivo main.py
+5. Entre na pasta frontend
    ```bash
-     streamlit run main.py
+     cd frontend
+   ```
+
+6. Rode o npm run dev e abra o localhost no navegador
+   ```bash
+     npm run dev
    ```
 
 # Membros participantes: 
