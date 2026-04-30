@@ -37,7 +37,14 @@ Repositório referente ao projeto da disciplina de Desenvolvimento de Software d
      cd frontend
    ```
 
-6. Rode o npm run dev e abra o localhost no navegador
+6. Crie uma env.local no frontend e preencha dessa forma com a url e key do supabase
+   ```bash
+     NEXT_PUBLIC_SUPABASE_URL= supabase_url
+
+     NEXT_PUBLIC_SUPABASE_ANON_KEY= supabase_anon_key
+   ```
+
+7. Rode o npm run dev e abra o localhost no navegador
    ```bash
      npm run dev
    ```
