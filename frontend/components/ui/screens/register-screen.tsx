@@ -3,7 +3,7 @@
 import { Sparkles } from "lucide-react"
 import { Screen } from "@/types/interview"
 import { useState } from "react"
-import { supabase } from "@/lib/lib/supabase"
+import { supabase } from "@/lib/supabase"
 
 interface RegisterScreenProps {
   navigateTo: (screen: Screen) => void

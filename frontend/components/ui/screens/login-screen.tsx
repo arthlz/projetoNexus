@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Screen } from "@/types/interview"
 import { useState } from "react"
-import { supabase } from "@/lib/lib/supabase"
+import { supabase } from "@/lib/supabase"
 
 interface LoginScreenProps {
   navigateTo: (screen: Screen) => void
