@@ -88,5 +88,11 @@ Repositório referente ao projeto da disciplina de Desenvolvimento de Software d
         <sub><b>Maria Clara Melo</b></sub>
       </a>
     </td>
+    <td align="center">
+      <a href="https://github.com/sophiasantossa">
+        <img src="https://avatars.githubusercontent.com/u/248780151?v=4" width="120px;" alt="Maria Clara"/><br>
+        <sub><b>Sophia Santos</b></sub>
+      </a>
+    </td>
   </tr>
 </table>
