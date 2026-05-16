@@ -3,29 +3,19 @@ from schemas import ConfigurarEntrevista, ExibirFeedback
 from tools import configurar_prompt, resposta_ia, gerar_feedback
 from voice_pipeline import VADDetector, transcrever_audio, handle_voice
 from datetime import datetime
+from database import supabase # importa o cliente configurado
 import uuid
 import json
 import re
 import asyncio
 
-db_temp = {}
+# Substituição do banco de dados temporário por uma tablea no supabase
 room_router = APIRouter(prefix="/room", tags=["room"])
 
 @room_router.post("/setup")
 async def configurar_sala(dados: ConfigurarEntrevista):
-   room_id = str(uuid.uuid4())
-   db_temp[room_id] = {
-      "config": dados,
-      "history": [],
-      "criado_em": datetime.now()
-   }
-
-   return {
-      "room_id": room_id,
-      "status": "success",
-      "message": "Configuração salva na memória!",
-      "config": dados.model_dump()
-   }
+   try:
+      persona_res = supabase.table("p")
 
 @room_router.websocket("/{room_id}/entrevista")
 async def iniciar_entrevista(ws: WebSocket, room_id: str):
