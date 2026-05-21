@@ -30,7 +30,7 @@ async def resposta_ia(historico_atual):
     try:
         # Se o trinity estiver indisponível, considerar: arcee-ai/arcee-blitz ou google/gemini-2.0-flash-thinking-exp:free
         resposta = await _cliente.chat.completions.create(
-            model="arcee-ai/trinity-large-preview:free", # Modelo com raciocínio estendido, mais adequado para gerar feedback criterioso
+            model="arcee-ai/trinity-large-thinking:free", # Modelo com raciocínio estendido, mais adequado para gerar feedback criterioso
             messages=historico_atual,
             extra_body={"reasoning": {"enabled": True}}
         )

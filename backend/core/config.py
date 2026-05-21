@@ -19,7 +19,7 @@ class Settings(BaseSettings):
 
     # ── LLM ─────────────────────────────────────────────────────────────────
     openrouter_api_key: str
-    llm_model: str = "arcee-ai/trinity-large-preview:free"
+    llm_model: str = "arcee-ai/trinity-large-thinking:free"
     llm_fallback_model: str = "google/gemini-2.0-flash-thinking-exp:free"
 
     # ── STT ─────────────────────────────────────────────────────────────────
