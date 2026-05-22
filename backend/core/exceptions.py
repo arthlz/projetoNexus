@@ -1,4 +1,15 @@
-# Todas as exceções customizadas do processo, pra saber direito o que está causando erro.
+"""
+core/exceptions.py
+──────────────────
+Hierarquia de exceções customizadas do Nexus.
+
+Ter exceções próprias em vez de lançar HTTPException diretamente nos
+serviços tem dois benefícios:
+  1. Os serviços ficam desacoplados do FastAPI (testáveis sem HTTP).
+  2. O handler global em main.py converte cada tipo em um status HTTP
+     apropriado, centralizando o mapeamento em um único lugar.
+"""
+
 
 class NexusBaseError(Exception):
     """Raiz da hierarquia de erros do Nexus."""

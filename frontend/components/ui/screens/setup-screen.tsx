@@ -42,19 +42,12 @@ export const SetupScreen = ({ language, setLanguage, onStart }: SetupScreenProps
 
       const data = await response.json()
       
-      if (data.status === "success" && data.room_id) {
-        onStart(data.room_id)
+      if (data.room_id) {
+        onStart(String(data.room_id))
       }
     } catch (error) {
-      console.warn("Backend não encontrado. Entrando em modo Mock.", error)
-      
-      // MODO MOCK: Gera um ID falso e avisa o usuário
-      const mockRoomId = `mock-${Math.random().toString(36).substring(7)}`
-      alert("⚠️ Backend offline! Entrando no Modo Simulação (apenas interface). A IA não vai responder.")
-      
-      onStart(mockRoomId)
-    } finally {
-      setIsLoading(false)
+      console.error("Erro ao configurar a sala:", error)
+      alert("❌ Erro ao conectar com o backend. Verifique se ele está rodando.")
     }
   }
 
