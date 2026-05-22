@@ -17,11 +17,11 @@ async def configurar_sala(dados: ConfigurarEntrevista):
    try:
       persona_res = supabase.table("p")
 
-@room_router.websocket("/{room_id}/entrevista")
-async def iniciar_entrevista(ws: WebSocket, room_id: str):
+@room_router.websocket("/{interview_id}/entrevista")
+async def iniciar_entrevista(ws: WebSocket, interview_id: str):
    await ws.accept()
 
-   sala = db_temp.get(room_id)
+   sala = db_temp.get(interview_id)
    if not sala:
       await ws.close(code=4004)
       return
