@@ -125,7 +125,7 @@ export function useVoiceCall(roomId: string | number | null) {
       audioCtxRef.current = ctx;
 
       const source    = ctx.createMediaStreamSource(stream);
-      const processor = ctx.createScriptProcessor(4096, 1, 1);
+      const processor = ctx.createScriptProcessor(8192, 1, 1);
       processorRef.current = processor;
 
       let overflow = new Int16Array(0);

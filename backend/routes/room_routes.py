@@ -74,7 +74,7 @@ async def get_optional_user() -> str:
     Retorna ID de dev. Substituir por get_current_user quando o front-end
     passar o header Authorization: Bearer <supabase_token>.
     """
-    return "dev-user-placeholder"
+    return "1"
 
 
 async def get_optional_ws_user(
