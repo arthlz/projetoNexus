@@ -85,17 +85,6 @@ export function useVoiceCall(roomId: string | number | null) {
     const ws  = new WebSocket(url);
     wsRef.current = ws;
 
-    const heartbeat = setInterval(() => {
-      if (aiSpeakingRef.current && wsRef.current?.readyState === WebSocket.OPEN) {
-        wsRef.current.send(new ArrayBuffer(960)); // frame de silêncio
-      }
-    }, 5000);
-
-    ws.onclose = (e) => {
-      clearInterval(heartbeat);
-      console.log('[Nexus WS] fechado:', e.code, e.reason);
-    };
-
     ws.onmessage = async (event) => {
       // Mensagem de controle JSON
       if (typeof event.data === 'string') {
@@ -119,6 +108,7 @@ export function useVoiceCall(roomId: string | number | null) {
     };
 
     ws.onerror = (e) => console.error('[Nexus WS] erro:', e);
+    ws.onclose = (e) => console.log('[Nexus WS] fechado:', e.code, e.reason);
   }, [playAIAudio]);
 
   // ── Início da chamada ─────────────────────────────────────────────────────
@@ -135,7 +125,7 @@ export function useVoiceCall(roomId: string | number | null) {
       audioCtxRef.current = ctx;
 
       const source    = ctx.createMediaStreamSource(stream);
-      const processor = ctx.createScriptProcessor(8192, 1, 1);
+      const processor = ctx.createScriptProcessor(4096, 1, 1);
       processorRef.current = processor;
 
       let overflow = new Int16Array(0);

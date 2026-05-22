@@ -1,15 +1,16 @@
 "use client"
 
 import { Home, Play, FileText, Clock, User, LogOut, Sparkles } from "lucide-react"
+import { Screen } from "@/types/interview" // 1. Importe o tipo Screen aqui
 
 interface SidebarProps {
-  currentScreen: string
-  navigateTo: (screen: string) => void
+  currentScreen: Screen | string // Permite Screen, mas aceita string caso currentScreen venha genérico
+  navigateTo: (screen: Screen) => void 
 }
 
 export const Sidebar = ({ currentScreen, navigateTo }: SidebarProps) => {
-  // Lista de itens do menu baseada nas suas imagens
-  const navItems = [
+
+  const navItems: { id: Screen; label: string; icon: any }[] = [
     { id: "dashboard", label: "Início", icon: Home },
     { id: "setup", label: "Nova Entrevista", icon: Play },
     { id: "resume", label: "Análise de Currículo", icon: FileText },
@@ -42,7 +43,7 @@ export const Sidebar = ({ currentScreen, navigateTo }: SidebarProps) => {
           return (
             <button
               key={item.id}
-              onClick={() => navigateTo(item.id)}
+              onClick={() => navigateTo(item.id)} 
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
                 isActive 
                   ? "bg-slate-800/80 text-cyan-400 font-medium border border-slate-700/50 shadow-sm" 
