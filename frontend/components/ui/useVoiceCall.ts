@@ -85,6 +85,17 @@ export function useVoiceCall(roomId: string | number | null) {
     const ws  = new WebSocket(url);
     wsRef.current = ws;
 
+    const heartbeat = setInterval(() => {
+      if (aiSpeakingRef.current && wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(new ArrayBuffer(960)); // frame de silêncio
+      }
+    }, 5000);
+
+    ws.onclose = (e) => {
+      clearInterval(heartbeat);
+      console.log('[Nexus WS] fechado:', e.code, e.reason);
+    };
+
     ws.onmessage = async (event) => {
       // Mensagem de controle JSON
       if (typeof event.data === 'string') {
@@ -108,7 +119,6 @@ export function useVoiceCall(roomId: string | number | null) {
     };
 
     ws.onerror = (e) => console.error('[Nexus WS] erro:', e);
-    ws.onclose = (e) => console.log('[Nexus WS] fechado:', e.code, e.reason);
   }, [playAIAudio]);
 
   // ── Início da chamada ─────────────────────────────────────────────────────

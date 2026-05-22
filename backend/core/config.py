@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     environment: str = "development"
 
     # ── WebSocket ────────────────────────────────────────────────────────────
-    ws_receive_timeout: float = 30.0   # segundos sem receber frame → encerra loop
+    ws_receive_timeout: float = 120.0   # segundos sem receber frame → encerra loop
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
