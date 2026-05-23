@@ -42,6 +42,11 @@ next-env.d.ts
 
 #pycache
 __pycache__/
+.pytest_cache
+
 # backend
 venv/
 backend/__pycache__/
+
+#vscode
+.vscode
