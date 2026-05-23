@@ -1,8 +1,10 @@
 "use client"
 
+import { supabase } from "@/lib/supabase"
 import { useState } from "react"
 import { Play, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+
 
 interface SetupScreenProps {
   language: "pt" | "en"
@@ -21,7 +23,8 @@ export const SetupScreen = ({ language, setLanguage, onStart }: SetupScreenProps
   const handleStartInterview = async () => {
     setIsLoading(true)
     try {
-      const response = await fetch("http://localhost:8000/room/setup", {
+      const API_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://localhost:8000';
+      const response = await fetch(`${API_URL}/room/setup`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
