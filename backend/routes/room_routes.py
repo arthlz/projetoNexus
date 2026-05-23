@@ -177,6 +177,7 @@ async def iniciar_entrevista(
     # ── IA abre a entrevista com a primeira pergunta ───────────────────────
     try:
         abertura_texto = await service.llm.chamar_llm(historico_sessao)
+        print(f"🤖 IA: {abertura_texto}")
         historico_sessao.append({"role": "assistant", "content": abertura_texto})
         service.salvar_mensagem(room_id, "assistant", abertura_texto)
 
@@ -226,6 +227,10 @@ async def iniciar_entrevista(
 
             try:
                 resposta_texto = await service.llm.chamar_llm(historico_sessao)
+                print(f"🤖 IA: {resposta_texto}")
+                if not resposta_texto or not resposta_texto.strip():
+                    await ws.send_json({"type": "done"})
+                    continue
                 historico_sessao.append({"role": "assistant", "content": resposta_texto})
                 service.salvar_mensagem(room_id, "assistant", resposta_texto)
 

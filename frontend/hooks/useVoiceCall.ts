@@ -82,6 +82,9 @@ export function useVoiceCall(roomId: string | number | null) {
 
   const connectWS = useCallback((id: string | number) => {
     const url = `${WS_BASE}/room/${id}/entrevista`;
+    if (wsRef.current && wsRef.current.readyState !== WebSocket.CLOSED) {
+      return;
+    }
     const ws  = new WebSocket(url);
     wsRef.current = ws;
 
