@@ -50,8 +50,9 @@ export function useVoiceCall(roomId: string | number | null) {
 
     // Cancela qualquer fala anterior da IA
     if (aiSourceRef.current) {
-      try { aiSourceRef.current.stop(); } catch (_) {}
-      aiSourceRef.current = null;
+      try { aiSourceRef.current.stop(); } catch (error) {
+        console.warn("Aviso: Falha ao parar o áudio anterior da IA.", error);
+      }
     }
 
     try {
@@ -94,7 +95,9 @@ export function useVoiceCall(roomId: string | number | null) {
             console.error('[Nexus WS]', msg.text);
           }
           // "transcript" e "done" podem ser usados pela UI via estado externo
-        } catch (_) {}
+        } catch (error) {
+          console.debug("Mensagem ignorada por não ser um JSON válido de controle.", error);
+        }
         return;
       }
 
@@ -171,8 +174,9 @@ export function useVoiceCall(roomId: string | number | null) {
   const stopCall = useCallback(async () => {
     // Para o áudio da IA se estiver tocando
     if (aiSourceRef.current) {
-      try { aiSourceRef.current.stop(); } catch (_) {}
-      aiSourceRef.current = null;
+      try { aiSourceRef.current.stop(); } catch (error) {
+        console.warn("Aviso: Falha ao parar o áudio anterior da IA.", error);
+      }
     }
 
     // Desconecta o processor antes de fechar o contexto
@@ -186,7 +190,9 @@ export function useVoiceCall(roomId: string | number | null) {
       audioCtxRef.current = null;
       try {
         if (ctx.state !== 'closed') await ctx.close();
-      } catch (_) {}
+      } catch (error) {
+        console.error("Erro ao fechar o AudioContext:", error);
+      }
     }
 
     streamRef.current?.getTracks().forEach((t) => t.stop());
