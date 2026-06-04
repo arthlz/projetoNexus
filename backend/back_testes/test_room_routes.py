@@ -9,6 +9,7 @@ from backend.core.exceptions import RoomNotFoundError, ForbiddenError
 
 # Configuração dos Mocks
 
+
 @pytest.fixture
 def mock_room_service():
     """
@@ -22,8 +23,9 @@ def mock_room_service():
     mock_service.encerrar_sala = AsyncMock()
     # obter_relatorio é uma função síncrona
     mock_service.obter_relatorio = MagicMock()
-    
+
     return mock_service
+
 
 @pytest.fixture
 def client(mock_room_service):
@@ -39,21 +41,22 @@ def client(mock_room_service):
 
 # Testes de Rotas HTTP
 
+
 def test_configurar_sala_sucesso(client, mock_room_service):
     # Simula que a criação da sala no banco retornou o ID 123
     mock_room_service.criar_sala.return_value = 123
-    
+
     payload = {
         "role": "Front-end Developer",
         "level": "Júnior",
         "language": "pt",
         "persona": "Acolhedor",
         "company": "Nexus Inc",
-        "analogy": "Matrix"
+        "analogy": "Matrix",
     }
-    
+
     response = client.post("/room/setup", json=payload)
-    
+
     assert response.status_code == 201
     dados = response.json()
     assert dados["room_id"] == 123
@@ -63,6 +66,7 @@ def test_configurar_sala_sucesso(client, mock_room_service):
     # Verifica se o método do serviço foi chamado corretamente
     mock_room_service.criar_sala.assert_called_once()
 
+
 def test_encerrar_entrevista_sucesso(client, mock_room_service):
     # Prepara o mock para retornar um FeedbackResponse válido
     mock_feedback = FeedbackResponse(
@@ -71,26 +75,30 @@ def test_encerrar_entrevista_sucesso(client, mock_room_service):
         comm=90,
         soft=85,
         feedback="Excelente comunicação técnica.",
-        status="completed"
+        status="completed",
     )
     mock_room_service.encerrar_sala.return_value = mock_feedback
-    
+
     response = client.post("/room/123/encerrar")
-    
+
     assert response.status_code == 200
     dados = response.json()
     assert dados["score"] == 85
     assert dados["feedback"] == "Excelente comunicação técnica."
 
+
 def test_encerrar_entrevista_sala_nao_encontrada(client, mock_room_service):
     # Simula o lançamento de uma exceção RoomNotFoundError pelo serviço
-    mock_room_service.encerrar_sala.side_effect = RoomNotFoundError("Sala não encontrada.")
-    
+    mock_room_service.encerrar_sala.side_effect = RoomNotFoundError(
+        "Sala não encontrada."
+    )
+
     response = client.post("/room/999/encerrar")
-    
+
     # O route handler intercepta o erro ou levanta HTTPException retornando 404
     assert response.status_code == 404
     assert response.json()["detail"] == "Sala não encontrada."
+
 
 def test_obter_relatorio_sucesso(client, mock_room_service):
     # Prepara um modelo falso de relatório
@@ -107,23 +115,26 @@ def test_obter_relatorio_sucesso(client, mock_room_service):
         comm=90,
         soft=100,
         feedback="Muito bom.",
-        messages=[{"sender": "user", "text": "Olá", "created_at": "2026-05-17T14:30:01"}]
+        messages=[
+            {"sender": "user", "text": "Olá", "created_at": "2026-05-17T14:30:01"}
+        ],
     )
     mock_room_service.obter_relatorio.return_value = mock_relatorio
-    
+
     response = client.get("/room/123/relatorio")
-    
+
     assert response.status_code == 200
     dados = response.json()
     assert dados["room_id"] == 123
     assert dados["role"] == "Back-end Developer"
     assert len(dados["messages"]) == 1
 
+
 def test_obter_relatorio_acesso_negado(client, mock_room_service):
     # Simula um erro de permissão (ex: utilizador tenta aceder à sala de outro)
     mock_room_service.obter_relatorio.side_effect = ForbiddenError("Acesso negado.")
-    
+
     response = client.get("/room/123/relatorio")
-    
+
     # O handler deve retornar 403 Forbidden
     assert response.status_code == 403

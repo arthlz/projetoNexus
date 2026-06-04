@@ -1,9 +1,7 @@
 """
-core/config.py
-──────────────
 Centraliza TODA a configuração da aplicação em um único lugar usando
 pydantic-settings. Isso garante que variáveis de ambiente sejam validadas
-na inicialização — o servidor não sobe se uma variável obrigatória estiver
+na inicialização, o servidor não sobe se uma variável obrigatória estiver
 faltando, prevenindo erros silenciosos em produção.
 """
 
@@ -30,14 +28,14 @@ class Settings(BaseSettings):
     environment: str = "development"
 
     # ── WebSocket ────────────────────────────────────────────────────────────
-    ws_receive_timeout: float = 120.0   # segundos sem receber frame → encerra loop
+    ws_receive_timeout: float = 120.0  # segundos sem receber frame → encerra loop
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     # Ajuste do caminho do arquivo env
     model_config = SettingsConfigDict(
-        env_file="backend/.env.local", # Ajuste o caminho aqui
-        env_file_encoding="utf-8"
+        env_file="backend/.env.local",  # Ajuste o caminho aqui
+        env_file_encoding="utf-8",
     )
 
     @property

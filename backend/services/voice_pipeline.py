@@ -28,7 +28,7 @@ import webrtcvad
 
 from backend.core.config import get_settings
 
-#  Mapas de idioma 
+#  Mapas de idioma
 
 # Código Nexus → código Deepgram STT
 DEEPGRAM_STT_LANG_MAP: dict[str, str] = {
@@ -43,7 +43,8 @@ DEEPGRAM_TTS_VOICE_MAP: dict[str, str] = {
 }
 
 
-# Configuração de áudio 
+# Configuração de áudio
+
 
 class AudioConfig:
     """
@@ -51,6 +52,7 @@ class AudioConfig:
     espalhados pelo código. Se o front-end mudar a taxa de amostragem,
     basta alterar aqui.
     """
+
     SAMPLE_RATE: int = 16000
     FRAME_MS: int = 30
     FRAME_BYTES: int = int(SAMPLE_RATE * FRAME_MS / 1000) * 2  # 960 bytes
@@ -58,7 +60,8 @@ class AudioConfig:
     SILENCE_FRAMES: int = 35  # ~1 segundo de silêncio
 
 
-# VAD 
+# VAD
+
 
 class VADDetector:
     """
@@ -107,6 +110,7 @@ class VADDetector:
 
 # STT
 
+
 def transcrever_audio(frames: list[bytes], language_code: str = "pt") -> str:
     """
     Recebe os frames de voz acumulados, monta um WAV em memória e
@@ -151,6 +155,7 @@ def transcrever_audio(frames: list[bytes], language_code: str = "pt") -> str:
 
 
 # TTS
+
 
 def sintetizar_fala(texto: str, language_code: str = "pt") -> bytes:
     """

@@ -8,11 +8,11 @@ from backend.schemas.room_schemas import (
     Cargo,
     Senioridade,
     Idioma,
-    Persona
+    Persona,
 )
 
+# Testes: ConfigurarEntrevistaRequest
 
-# Testes: ConfigurarEntrevistaRequest 
 
 def test_configurar_entrevista_request_sucesso():
     """Garante que o Pydantic aceita e converte um payload válido com Enums."""
@@ -22,11 +22,11 @@ def test_configurar_entrevista_request_sucesso():
         "language": "pt",
         "persona": "Acolhedor",
         "company": "Nexus Inc",
-        "analogy": "Construir uma casa"
+        "analogy": "Construir uma casa",
     }
-    
+
     schema = ConfigurarEntrevistaRequest(**payload)
-    
+
     # O Pydantic converte automaticamente as strings nos tipos Enum correspondentes
     assert schema.role == Cargo.FRONT_END
     assert schema.level == Senioridade.JUNIOR
@@ -38,17 +38,19 @@ def test_configurar_entrevista_request_sucesso():
 def test_configurar_entrevista_request_enum_invalido():
     """Garante que falha ao receber um cargo que não faz parte das opções do Enum."""
     payload = {
-        "role": "Programador de Jogos", # Cargo inexistente no Enum Cargo
+        "role": "Programador de Jogos",  # Cargo inexistente no Enum Cargo
         "level": "Júnior",
         "language": "pt",
-        "persona": "Acolhedor"
+        "persona": "Acolhedor",
     }
-    
+
     with pytest.raises(ValidationError) as exc:
         ConfigurarEntrevistaRequest(**payload)
-        
+
     assert "Input should be" in str(exc.value)
-    assert "Front-end Developer" in str(exc.value) # O erro do Pydantic sugere as opções válidas
+    assert "Front-end Developer" in str(
+        exc.value
+    )  # O erro do Pydantic sugere as opções válidas
 
 
 def test_configurar_entrevista_request_limites_tamanho():
@@ -78,7 +80,8 @@ def test_configurar_entrevista_request_limites_tamanho():
     assert "String should have at most 100 characters" in str(exc_analogy.value)
 
 
-#  Testes: FeedbackResponse 
+#  Testes: FeedbackResponse
+
 
 def test_feedback_response_notas_validas():
     """Garante que as notas dentro do intervalo de 0 a 100 são aceites."""
@@ -87,21 +90,23 @@ def test_feedback_response_notas_validas():
         "tech": 85,
         "comm": 0,
         "soft": 50,
-        "feedback": "Bom trabalho."
+        "feedback": "Bom trabalho.",
     }
     schema = FeedbackResponse(**payload)
-    
+
     assert schema.score == 100
     assert schema.comm == 0
-    assert schema.status == "completed" # Valor por defeito foi aplicado
+    assert schema.status == "completed"  # Valor por defeito foi aplicado
 
 
 def test_feedback_response_notas_fora_do_limite():
     """Garante que o schema rejeita avaliações negativas ou superiores a 100."""
-    
+
     # Testar limite superior (> 100)
     with pytest.raises(ValidationError) as exc_maior:
-        FeedbackResponse(score=101, tech=80, comm=80, soft=80, feedback="Nota muito alta")
+        FeedbackResponse(
+            score=101, tech=80, comm=80, soft=80, feedback="Nota muito alta"
+        )
     assert "Input should be less than or equal to 100" in str(exc_maior.value)
 
     # Testar limite inferior (< 0)

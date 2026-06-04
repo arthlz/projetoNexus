@@ -1,6 +1,5 @@
 """
-middleware/auth.py
-──────────────────
+
 Validação de JWT emitido pelo Supabase Auth.
 
 Por que validar no back-end e não confiar no front-end?

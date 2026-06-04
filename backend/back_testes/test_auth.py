@@ -1,4 +1,3 @@
-
 import pytest
 from unittest.mock import patch, MagicMock
 from fastapi.security import HTTPAuthorizationCredentials
@@ -8,8 +7,8 @@ from jose import JWTError
 from backend.middleware.auth import _decode_token, get_current_user, get_ws_user
 from backend.core.exceptions import UnauthorizedError
 
+# Configuração de Mocks Globais
 
-# Configuração de Mocks Globais 
 
 @pytest.fixture(autouse=True)
 def mock_env_settings():
@@ -25,6 +24,7 @@ def mock_env_settings():
 
 # Testes: Decodificação Interna (_decode_token)
 
+
 @patch("backend.middleware.auth.jwt.decode")
 def test_decode_token_sucesso(mock_jwt_decode):
     """Garante que a função retorna o payload quando a assinatura do JWT é válida."""
@@ -32,7 +32,7 @@ def test_decode_token_sucesso(mock_jwt_decode):
     mock_jwt_decode.return_value = payload_simulado
 
     resultado = _decode_token("token_valido_falso")
-    
+
     assert resultado == payload_simulado
     mock_jwt_decode.assert_called_once()
     # Verifica se a flag verify_aud=False foi passada corretamente para o Supabase
@@ -51,14 +51,15 @@ def test_decode_token_invalido_ou_expirado(mock_jwt_decode):
 
 # ── Testes: Rotas HTTP (get_current_user)
 
+
 @patch("backend.middleware.auth.jwt.decode")
 def test_get_current_user_sucesso(mock_jwt_decode):
     """Garante que o ID do utilizador (sub) é extraído corretamente de uma requisição HTTP."""
     mock_jwt_decode.return_value = {"sub": "uuid-do-utilizador-999"}
-    
+
     # O FastAPI injeta o token através do esquema HTTPBearer
     credenciais = HTTPAuthorizationCredentials(scheme="Bearer", credentials="meu_jwt")
-    
+
     user_id = get_current_user(credenciais)
     assert user_id == "uuid-do-utilizador-999"
 
@@ -66,22 +67,23 @@ def test_get_current_user_sucesso(mock_jwt_decode):
 @patch("backend.middleware.auth.jwt.decode")
 def test_get_current_user_sem_sub(mock_jwt_decode):
     """Garante que um token válido, mas sem o campo 'sub', é rejeitado."""
-    mock_jwt_decode.return_value = {"email": "teste@nexus.com"} # Falta o 'sub'
-    
+    mock_jwt_decode.return_value = {"email": "teste@nexus.com"}  # Falta o 'sub'
+
     credenciais = HTTPAuthorizationCredentials(scheme="Bearer", credentials="meu_jwt")
-    
+
     with pytest.raises(UnauthorizedError, match="Token não contém campo 'sub'"):
         get_current_user(credenciais)
 
 
 # Testes: WebSockets (get_ws_user)
 
+
 @pytest.mark.asyncio
 @patch("backend.middleware.auth.jwt.decode")
 async def test_get_ws_user_sucesso(mock_jwt_decode):
     """Garante que a extração por query parameter em WebSockets funciona (Assíncrono)."""
     mock_jwt_decode.return_value = {"sub": "uuid-ws-123"}
-    
+
     user_id = await get_ws_user(token="token_da_url")
     assert user_id == "uuid-ws-123"
 
@@ -91,6 +93,6 @@ async def test_get_ws_user_sucesso(mock_jwt_decode):
 async def test_get_ws_user_invalido(mock_jwt_decode):
     """Garante que o WebSocket falha e propaga a exceção para que o ciclo WS a apanhe."""
     mock_jwt_decode.side_effect = JWTError("Token expirado")
-    
+
     with pytest.raises(UnauthorizedError):
         await get_ws_user(token="token_da_url")

@@ -9,6 +9,7 @@ sys.path.insert(0, project_root)
 
 from backend.main import app
 
+
 @pytest.fixture(scope="module")
 def client():
     with TestClient(app) as c:

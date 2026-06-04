@@ -1,26 +1,7 @@
-"""
-services/llm_service.py
-───────────────────────
-Camada de abstração sobre o OpenRouter / LLM.
-
-Por que abstrair o LLM em um serviço próprio?
-  - Facilita trocar de provedor (OpenRouter → Anthropic → Azure) sem
-    alterar o resto do código.
-  - Centraliza lógica de retry e fallback em um único lugar.
-  - Permite mockar o LLM nos testes unitários do RoomService.
-
-Decisão sobre modelo:
-  O modelo padrão é trinity-large-preview com raciocínio estendido,
-  que produz feedback mais criterioso. Se ele estiver indisponível
-  (acontece com modelos "free"), o serviço tenta o modelo de fallback
-  automaticamente sem propagar o erro ao usuário.
-"""
-
 from openai import AsyncOpenAI
 
 from backend.core.config import get_settings
 from backend.core.exceptions import LLMError
-
 
 # Mapa de idioma config → nome completo para o prompt
 MAPA_IDIOMAS: dict[str, str] = {
@@ -119,12 +100,14 @@ class LLMService:
         contexto_empresa = (
             f"\nCONTEXTO DA EMPRESA: A entrevista simula um processo seletivo na "
             f"empresa '{empresa}'. Adapte o tom e as perguntas a esse contexto."
-            if empresa else ""
+            if empresa
+            else ""
         )
         contexto_analogia = (
             f"\nTEMÁTICA CRIATIVA: Use '{analogia}' como analogia para construir "
             f"perguntas situacionais de forma natural, sem abandonar o rigor técnico."
-            if analogia else ""
+            if analogia
+            else ""
         )
 
         system_content = f"""

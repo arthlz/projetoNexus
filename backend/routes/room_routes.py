@@ -1,7 +1,6 @@
 """
-routes/room_routes.py
-─────────────────────
-Rotas da API do domínio "room".
+
+Rotas da API do domínio "room" = interview_id.
 
 SOBRE AUTENTICAÇÃO NESTA VERSÃO
   O front-end atual (SetupScreen, CallScreen) ainda não envia header
@@ -69,6 +68,7 @@ room_router = APIRouter(prefix="/room", tags=["room"])
 
 # ── Auth com fallback (remover quando front-end enviar tokens) ────────────────
 
+
 async def get_optional_user() -> str:
     """
     Retorna ID de dev. Substituir por get_current_user quando o front-end
@@ -95,13 +95,17 @@ async def get_optional_ws_user(
 
 # ── Fábrica do serviço ────────────────────────────────────────────────────────
 
+
 def get_room_service() -> RoomService:
     return RoomService(db=get_db(), llm=LLMService())
 
 
 # ── POST /room/setup ──────────────────────────────────────────────────────────
 
-@room_router.post("/setup", response_model=SetupResponse, status_code=status.HTTP_201_CREATED)
+
+@room_router.post(
+    "/setup", response_model=SetupResponse, status_code=status.HTTP_201_CREATED
+)
 async def configurar_sala(
     dados: ConfigurarEntrevistaRequest,
     user_id: Annotated[str, Depends(get_optional_user)],
@@ -116,11 +120,12 @@ async def configurar_sala(
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
-        )
+        ) from exc
     return SetupResponse(room_id=room_id, config=dados)
 
 
 # ── WS /room/{room_id}/entrevista ─────────────────────────────────────────────
+
 
 @room_router.websocket("/{room_id}/entrevista")
 async def iniciar_entrevista(
@@ -226,7 +231,9 @@ async def iniciar_entrevista(
 
             try:
                 resposta_texto = await service.llm.chamar_llm(historico_sessao)
-                historico_sessao.append({"role": "assistant", "content": resposta_texto})
+                historico_sessao.append(
+                    {"role": "assistant", "content": resposta_texto}
+                )
                 service.salvar_mensagem(room_id, "assistant", resposta_texto)
 
                 # TTS em thread separada (HTTP síncrono para Deepgram)
@@ -247,6 +254,7 @@ async def iniciar_entrevista(
 
 # ── POST /room/{room_id}/encerrar ─────────────────────────────────────────────
 
+
 @room_router.post("/{room_id}/encerrar", response_model=FeedbackResponse)
 async def encerrar_entrevista(
     room_id: int,
@@ -259,17 +267,20 @@ async def encerrar_entrevista(
     """
     try:
         return await service.encerrar_sala(room_id=room_id, user_id=user_id)
-    except RoomNotFoundError:
-        raise HTTPException(status_code=404, detail="Sala não encontrada.")
-    except ForbiddenError:
-        raise HTTPException(status_code=403, detail="Acesso negado.")
+    except RoomNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Sala não encontrada.") from exc
+    except ForbiddenError as exc:
+        raise HTTPException(status_code=403, detail="Acesso negado.") from exc
     except (LLMError, InvalidFeedbackError) as exc:
-        raise HTTPException(status_code=500, detail=f"Erro na avaliação: {exc}")
+        raise HTTPException(
+            status_code=500, detail=f"Erro na avaliação: {exc}"
+        ) from exc
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Erro inesperado: {exc}")
+        raise HTTPException(status_code=500, detail=f"Erro inesperado: {exc}") from exc
 
 
 # ── GET /room/{room_id}/relatorio ─────────────────────────────────────────────
+
 
 @room_router.get("/{room_id}/relatorio", response_model=ReportResponse)
 async def obter_relatorio(
@@ -289,7 +300,7 @@ async def obter_relatorio(
     """
     try:
         return service.obter_relatorio(room_id=room_id, user_id=user_id)
-    except RoomNotFoundError:
-        raise HTTPException(status_code=404, detail="Sala não encontrada.")
-    except ForbiddenError:
-        raise HTTPException(status_code=403, detail="Acesso negado.")
+    except RoomNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Sala não encontrada.") from exc
+    except ForbiddenError as exc:
+        raise HTTPException(status_code=403, detail="Acesso negado.") from exc

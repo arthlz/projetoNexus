@@ -1,6 +1,4 @@
 """
-services/room_service.py
-────────────────────────
 Lógica de negócio das salas de entrevista.
 
 Responsabilidades:
@@ -73,13 +71,15 @@ class RoomService:
 
         result = (
             self.db.table("interviews")
-            .insert({
-                "user_id": user_id,
-                "interviewer_persona_id": persona_id,
-                "interview_type": config.role.value,
-                "difficulty_level": config.level.value,
-                "extra_config": config.model_dump(mode="json"),
-            })
+            .insert(
+                {
+                    "user_id": user_id,
+                    "interviewer_persona_id": persona_id,
+                    "interview_type": config.role.value,
+                    "difficulty_level": config.level.value,
+                    "extra_config": config.model_dump(mode="json"),
+                }
+            )
             .execute()
         )
         return result.data[0]["id"]
@@ -97,11 +97,7 @@ class RoomService:
         Retorna o registro completo da entrevista para uso pelo caller.
         """
         result = (
-            self.db.table("interviews")
-            .select("*")
-            .eq("id", room_id)
-            .single()
-            .execute()
+            self.db.table("interviews").select("*").eq("id", room_id).single().execute()
         )
         if not result.data:
             raise RoomNotFoundError(f"Sala {room_id} não encontrada.")
@@ -123,11 +119,13 @@ class RoomService:
         Salvo incrementalmente (não em batch) para sobreviver a quedas de
         conexão — o histórico parcial fica disponível para /encerrar.
         """
-        self.db.table("interview_messages").insert({
-            "interview_id": room_id,
-            "sender": sender,
-            "message_text": text,
-        }).execute()
+        self.db.table("interview_messages").insert(
+            {
+                "interview_id": room_id,
+                "sender": sender,
+                "message_text": text,
+            }
+        ).execute()
 
     def carregar_historico(self, room_id: int) -> list[dict]:
         """
@@ -227,10 +225,10 @@ class RoomService:
             language=config_extra.get("language", "pt"),
             date=str(interview.get("created_at", "")),
             score=int(fb["vocabulary_score"]) if fb else None,
-            tech=int(fb["technical_score"])   if fb else None,
-            comm=int(fb["clarity_score"])     if fb else None,
-            soft=int(fb["logic_score"])       if fb else None,
-            feedback=fb["ai_feedback_text"]   if fb else None,
+            tech=int(fb["technical_score"]) if fb else None,
+            comm=int(fb["clarity_score"]) if fb else None,
+            soft=int(fb["logic_score"]) if fb else None,
+            feedback=fb["ai_feedback_text"] if fb else None,
             messages=mensagens,
         )
 
@@ -269,15 +267,17 @@ class RoomService:
         Requer a migration 001 que adiciona interview_id à tabela feedback
         e torna answer_id nullable.
         """
-        self.db.table("feedback").insert({
-            "interview_id":    room_id,
-            "technical_score": feedback.tech,
-            "clarity_score":   feedback.comm,
-            "logic_score":     feedback.soft,
-            "vocabulary_score": feedback.score,
-            "ai_feedback_text": feedback.feedback,
-        }).execute()
+        self.db.table("feedback").insert(
+            {
+                "interview_id": room_id,
+                "technical_score": feedback.tech,
+                "clarity_score": feedback.comm,
+                "logic_score": feedback.soft,
+                "vocabulary_score": feedback.score,
+                "ai_feedback_text": feedback.feedback,
+            }
+        ).execute()
 
-        self.db.table("interviews").update(
-            {"final_score": feedback.score}
-        ).eq("id", room_id).execute()
+        self.db.table("interviews").update({"final_score": feedback.score}).eq(
+            "id", room_id
+        ).execute()

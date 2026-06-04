@@ -58,6 +58,7 @@ app.add_middleware(
 
 # ── Exception handlers globais ────────────────────────────────────────────────
 
+
 @app.exception_handler(UnauthorizedError)
 async def unauthorized_handler(request: Request, exc: UnauthorizedError):
     return JSONResponse(status_code=401, content={"detail": str(exc)})
@@ -92,6 +93,7 @@ app.include_router(room_router)
 
 
 # ── Healthcheck ───────────────────────────────────────────────────────────────
+
 
 @app.get("/", tags=["health"])
 async def root():
