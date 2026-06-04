@@ -1,233 +1,134 @@
+import { useCallback, useState } from "react";
+import { useAudioCapture } from "./useAudioCapture";
+import { useAudioPlayer } from "./useAudioPlayer";
+import { useWebSocket, type ServerMessage } from "./useWebSocket";
+
 /**
- * hooks/useVoiceCall.ts
- * ─────────────────────
- * Hook que gerencia toda a comunicação de voz com o back-end via WebSocket.
+ * Orquestrador fino: compõe useWebSocket + useAudioCapture + useAudioPlayer
+ * e expõe apenas a interface de alto nível que os componentes de UI precisam.
  *
- * MUDANÇAS em relação à versão original:
+ * Cada responsabilidade vive em seu próprio hook:
+ *  - useWebSocket   → conexão e protocolo WS
+ *  - useAudioCapture → captura do microfone e emissão de frames PCM
+ *  - useAudioPlayer  → fila de reprodução dos chunks MP3 da IA
  *
- * 1. ÁUDIO BINÁRIO DA IA
- *    O back-end agora envia bytes MP3 diretamente (Deepgram TTS).
- *    O handler de mensagens binárias já existia mas estava comentado —
- *    agora está ativo e reproduz o áudio automaticamente.
- *    Utilizamos AudioContext.decodeAudioData em vez de new Audio(url)
- *    para garantir compatibilidade cross-browser e controle de sobreposição
- *    (cancela o áudio anterior se o candidato falar durante a resposta).
- *
- * 2. ESTADO isAISpeaking
- *    Exposto para que a CallScreen anime o orb enquanto a IA fala,
- *    e bloqueie o envio de frames (evita capturar o áudio da própria IA).
- *
- * 3. PAUSA REAL DO MICROFONE
- *    togglePauseAudio suspende o AudioContext, o que interrompe tanto o
- *    envio de frames quanto a reprodução do áudio da IA.
- *
- * 4. LIMPEZA DE RECURSOS
- *    stopCall() cancela corretamente a fonte de áudio ativa (aiSourceNode)
- *    antes de fechar o contexto, evitando erros de "already closed".
+ * Este hook só gerencia estado de UI (status, transcript, errorMessage)
+ * e a sequência de inicialização/encerramento.
  */
 
-import { useState, useRef, useCallback } from 'react';
+// ─── Tipos públicos do hook ───────────────────────────────────────────────────
 
-const WS_BASE = process.env.NEXT_PUBLIC_API_WS_URL ?? 'ws://localhost:8000';
+export type CallStatus =
+  | "idle"        // antes de qualquer ação
+  | "connecting"  // aguardando WS abrir + permissão de microfone
+  | "active"      // entrevista em andamento
+  | "ai_speaking" // IA está respondendo (microfone pausado)
+  | "ended"       // entrevista encerrada normalmente
+  | "error";      // falha irrecuperável
 
-export function useVoiceCall(roomId: string | number | null) {
-  const [isCalling, setIsCalling]       = useState(false);
-  const [isAISpeaking, setIsAISpeaking] = useState(false);
+export interface TranscriptEntry {
+  speaker: "user" | "ai";
+  text: string;
+}
 
-  const wsRef           = useRef<WebSocket | null>(null);
-  const streamRef       = useRef<MediaStream | null>(null);
-  const audioCtxRef     = useRef<AudioContext | null>(null);
-  const processorRef    = useRef<ScriptProcessorNode | null>(null);
-  const aiSourceRef     = useRef<AudioBufferSourceNode | null>(null);
-  // Flag interna: bloqueia envio de frames enquanto a IA fala
-  const aiSpeakingRef   = useRef(false);
+export interface UseVoiceCallReturn {
+  /** Estado atual da chamada */
+  status: CallStatus;
+  /** Histórico de transcrições da entrevista */
+  transcript: TranscriptEntry[];
+  /** Mensagem de erro legível, se status === "error" */
+  errorMessage: string | null;
+  /** Inicia a entrevista: abre WS e começa captura de microfone */
+  startInterview: () => Promise<void>;
+  /** Encerra a entrevista e libera todos os recursos */
+  endInterview: () => void;
+}
 
-  // ── Reprodução do áudio da IA ─────────────────────────────────────────────
+interface Options {
+  roomId: string;
+  token: string;
+}
 
-  const playAIAudio = useCallback(async (data: ArrayBuffer) => {
-    const ctx = audioCtxRef.current;
-    if (!ctx || ctx.state === 'closed') return;
+export function useVoiceCall({ roomId, token }: Options): UseVoiceCallReturn {
+  const [status, setStatus] = useState<CallStatus>("idle");
+  const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-    // Cancela qualquer fala anterior da IA
-    if (aiSourceRef.current) {
-      try { aiSourceRef.current.stop(); } catch (error) {
-        console.warn("Aviso: Falha ao parar o áudio anterior da IA.", error);
-      }
+  // ── Player de áudio ────────────────────────────────────────────────────────
+  const { enqueueChunk, flush: flushAudio } = useAudioPlayer();
+
+  // ── Handlers de mensagens do backend ──────────────────────────────────────
+  const handleMessage = useCallback((msg: ServerMessage) => {
+    switch (msg.type) {
+      case "transcript":
+        setTranscript((prev) => [...prev, { speaker: "ai", text: msg.text }]);
+        break;
+      case "done":
+        // IA terminou de falar — devolve o microfone ao usuário
+        setStatus("active");
+        break;
+      case "error":
+        setErrorMessage(msg.text);
+        // Erros não-fatais: mantém a entrevista ativa
+        break;
     }
+  }, []);
+
+  const handleAudioChunk = useCallback(
+    (chunk: ArrayBuffer) => {
+      setStatus("ai_speaking");
+      enqueueChunk(chunk);
+    },
+    [enqueueChunk]
+  );
+
+  // ── WebSocket ──────────────────────────────────────────────────────────────
+  const { connect, disconnect, sendFrame, error: wsError } = useWebSocket({
+    roomId,
+    token,
+    onMessage: handleMessage,
+    onAudioChunk: handleAudioChunk,
+  });
+
+  // ── Captura de áudio ───────────────────────────────────────────────────────
+  const { startCapture, stopCapture } = useAudioCapture(sendFrame);
+
+  // ── API pública ────────────────────────────────────────────────────────────
+
+  const startInterview = useCallback(async () => {
+    setStatus("connecting");
+    setTranscript([]);
+    setErrorMessage(null);
 
     try {
-      const buffer = await ctx.decodeAudioData(data.slice(0)); // cópia para evitar detach
-      const source = ctx.createBufferSource();
-      source.buffer = buffer;
-      source.connect(ctx.destination);
-
-      aiSpeakingRef.current = true;
-      setIsAISpeaking(true);
-
-      source.onended = () => {
-        aiSpeakingRef.current = false;
-        setIsAISpeaking(false);
-        aiSourceRef.current = null;
-      };
-
-      source.start();
-      aiSourceRef.current = source;
+      connect();
+      await startCapture();
+      setStatus("active");
     } catch (err) {
-      console.error('Erro ao decodificar áudio da IA:', err);
-      aiSpeakingRef.current = false;
-      setIsAISpeaking(false);
+      const msg = err instanceof Error ? err.message : "Falha ao iniciar entrevista.";
+      setErrorMessage(msg);
+      setStatus("error");
     }
-  }, []);
+  }, [connect, startCapture]);
 
-  // ── Conexão WebSocket ─────────────────────────────────────────────────────
+  const endInterview = useCallback(() => {
+    stopCapture();
+    disconnect();
+    flushAudio();
+    setStatus("ended");
+  }, [stopCapture, disconnect, flushAudio]);
 
-  const connectWS = useCallback((id: string | number) => {
-    const url = `${WS_BASE}/room/${id}/entrevista`;
-    const ws  = new WebSocket(url);
-    wsRef.current = ws;
-
-    ws.onmessage = async (event) => {
-      // Mensagem de controle JSON
-      if (typeof event.data === 'string') {
-        try {
-          const msg = JSON.parse(event.data);
-          if (msg.type === 'error') {
-            console.error('[Nexus WS]', msg.text);
-          }
-          // "transcript" e "done" podem ser usados pela UI via estado externo
-        } catch (error) {
-          console.debug("Mensagem ignorada por não ser um JSON válido de controle.", error);
-        }
-        return;
-      }
-
-      // Bytes binários = MP3 da resposta da IA
-      if (event.data instanceof Blob) {
-        const ab = await event.data.arrayBuffer();
-        await playAIAudio(ab);
-      } else if (event.data instanceof ArrayBuffer) {
-        await playAIAudio(event.data);
-      }
-    };
-
-    ws.onerror = (e) => console.error('[Nexus WS] erro:', e);
-    ws.onclose = (e) => console.log('[Nexus WS] fechado:', e.code, e.reason);
-  }, [playAIAudio]);
-
-  // ── Início da chamada ─────────────────────────────────────────────────────
-
-  const startCall = useCallback(async () => {
-    if (!roomId) return;
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-
-      // AudioContext a 16 kHz — exigido pelo VAD do back-end
-      const ctx = new AudioContext({ sampleRate: 16000 });
-      audioCtxRef.current = ctx;
-
-      const source    = ctx.createMediaStreamSource(stream);
-      const processor = ctx.createScriptProcessor(4096, 1, 1);
-      processorRef.current = processor;
-
-      let overflow = new Int16Array(0);
-
-      processor.onaudioprocess = (e) => {
-        // Não envia frames enquanto a IA está falando
-        if (aiSpeakingRef.current) return;
-        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
-
-        const float32 = e.inputBuffer.getChannelData(0);
-        const int16   = new Int16Array(float32.length);
-
-        for (let i = 0; i < float32.length; i++) {
-          const s = Math.max(-1, Math.min(1, float32[i]));
-          int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
-        }
-
-        // Acumula e fatia em chunks de 480 amostras = 960 bytes (30 ms)
-        const combined = new Int16Array(overflow.length + int16.length);
-        combined.set(overflow);
-        combined.set(int16, overflow.length);
-
-        let offset = 0;
-        while (offset + 480 <= combined.length) {
-          wsRef.current.send(combined.slice(offset, offset + 480).buffer);
-          offset += 480;
-        }
-        overflow = combined.slice(offset);
-      };
-
-      source.connect(processor);
-      processor.connect(ctx.destination);
-
-      connectWS(roomId);
-      setIsCalling(true);
-    } catch (err) {
-      console.error('Erro ao iniciar chamada:', err);
-    }
-  }, [roomId, connectWS]);
-
-  // ── Encerramento ──────────────────────────────────────────────────────────
-
-  const stopCall = useCallback(async () => {
-    // Para o áudio da IA se estiver tocando
-    if (aiSourceRef.current) {
-      try { aiSourceRef.current.stop(); } catch (error) {
-        console.warn("Aviso: Falha ao parar o áudio anterior da IA.", error);
-      }
-    }
-
-    // Desconecta o processor antes de fechar o contexto
-    if (processorRef.current) {
-      processorRef.current.disconnect();
-      processorRef.current = null;
-    }
-
-    if (audioCtxRef.current) {
-      const ctx = audioCtxRef.current;
-      audioCtxRef.current = null;
-      try {
-        if (ctx.state !== 'closed') await ctx.close();
-      } catch (error) {
-        console.error("Erro ao fechar o AudioContext:", error);
-      }
-    }
-
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    streamRef.current = null;
-
-    wsRef.current?.close();
-    wsRef.current = null;
-
-    aiSpeakingRef.current = false;
-    setIsAISpeaking(false);
-    setIsCalling(false);
-  }, []);
-
-  // ── Controles de microfone ────────────────────────────────────────────────
-
-  const toggleMuteAudio = useCallback((muted: boolean) => {
-    streamRef.current?.getAudioTracks().forEach((t) => {
-      t.enabled = !muted;
-    });
-  }, []);
-
-  const togglePauseAudio = useCallback((paused: boolean) => {
-    const ctx = audioCtxRef.current;
-    if (!ctx) return;
-    if (paused && ctx.state === 'running')   ctx.suspend();
-    if (!paused && ctx.state === 'suspended') ctx.resume();
-  }, []);
+  // Repassa erro de WS para o estado de UI
+  if (wsError && status !== "error") {
+    setErrorMessage(wsError);
+    setStatus("error");
+  }
 
   return {
-    isCalling,
-    isAISpeaking,
-    wsRef,
-    startCall,
-    stopCall,
-    toggleMuteAudio,
-    togglePauseAudio,
+    status,
+    transcript,
+    errorMessage,
+    startInterview,
+    endInterview,
   };
 }
