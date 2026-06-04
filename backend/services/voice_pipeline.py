@@ -1,6 +1,4 @@
 """
-services/voice_pipeline.py
-──────────────────────────
 Pipeline de voz completo: VAD + STT (Deepgram) + TTS (Deepgram).
 
 Por que Deepgram para TTS também?
@@ -30,7 +28,7 @@ import webrtcvad
 
 from backend.core.config import get_settings
 
-# ── Mapas de idioma ───────────────────────────────────────────────────────────
+#  Mapas de idioma 
 
 # Código Nexus → código Deepgram STT
 DEEPGRAM_STT_LANG_MAP: dict[str, str] = {
@@ -45,7 +43,7 @@ DEEPGRAM_TTS_VOICE_MAP: dict[str, str] = {
 }
 
 
-# ── Configuração de áudio ─────────────────────────────────────────────────────
+# Configuração de áudio 
 
 class AudioConfig:
     """
@@ -60,7 +58,7 @@ class AudioConfig:
     SILENCE_FRAMES: int = 35  # ~1 segundo de silêncio
 
 
-# ── VAD ───────────────────────────────────────────────────────────────────────
+# VAD 
 
 class VADDetector:
     """
@@ -107,7 +105,7 @@ class VADDetector:
         self._speaking = False
 
 
-# ── STT ───────────────────────────────────────────────────────────────────────
+# STT
 
 def transcrever_audio(frames: list[bytes], language_code: str = "pt") -> str:
     """
@@ -152,7 +150,7 @@ def transcrever_audio(frames: list[bytes], language_code: str = "pt") -> str:
         return ""
 
 
-# ── TTS ───────────────────────────────────────────────────────────────────────
+# TTS
 
 def sintetizar_fala(texto: str, language_code: str = "pt") -> bytes:
     """
