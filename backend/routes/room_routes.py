@@ -1,20 +1,5 @@
 """
-
 Rotas da API do domínio "room" = interview_id.
-
-SOBRE AUTENTICAÇÃO NESTA VERSÃO
-  O front-end atual (SetupScreen, CallScreen) ainda não envia header
-  Authorization nem o query param ?token= no WebSocket — o fluxo de login
-  existe mas o token não é repassado às chamadas de API.
-
-  Para não bloquear o desenvolvimento, as rotas usam get_optional_user /
-  get_optional_ws_user, que aceitam o token se vier mas usam um ID de dev
-  como fallback caso contrário.
-
-  Para ativar autenticação obrigatória quando o front-end estiver pronto:
-    1. Substituir get_optional_user    → get_current_user  nas rotas HTTP.
-    2. Substituir get_optional_ws_user → get_ws_user       no WebSocket.
-  O middleware/auth.py já está completo e funcional para isso.
 
 PROTOCOLO WEBSOCKET (entrevista 100% por voz)
   ← front-end envia frames PCM 16-bit de 960 bytes continuamente
@@ -52,7 +37,7 @@ from backend.core.exceptions import (
     RoomNotFoundError,
     UnauthorizedError,
 )
-from backend.middleware.auth import get_ws_user
+from backend.middleware.auth import get_current_user, get_ws_user
 from backend.schemas.room_schemas import (
     ConfigurarEntrevistaRequest,
     FeedbackResponse,
@@ -66,41 +51,14 @@ from backend.services import voice_pipeline
 room_router = APIRouter(prefix="/room", tags=["room"])
 
 
-# ── Auth com fallback (remover quando front-end enviar tokens) ────────────────
-
-
-async def get_optional_user() -> str:
-    """
-    Retorna ID de dev. Substituir por get_current_user quando o front-end
-    passar o header Authorization: Bearer <supabase_token>.
-    """
-    return "1"
-
-
-async def get_optional_ws_user(
-    token: str | None = Query(default=None),
-) -> str:
-    """
-    Tenta validar o JWT do query param ?token=.
-    Fallback para ID de dev se ausente.
-    Substituir por get_ws_user quando o front-end passar ?token=<jwt>.
-    """
-    if token:
-        try:
-            return await get_ws_user(token)
-        except (UnauthorizedError, Exception):
-            pass
-    return "dev-user-placeholder"
-
-
-# ── Fábrica do serviço ────────────────────────────────────────────────────────
+#Fábrica do serviço
 
 
 def get_room_service() -> RoomService:
     return RoomService(db=get_db(), llm=LLMService())
 
 
-# ── POST /room/setup ──────────────────────────────────────────────────────────
+# POST /room/setup
 
 
 @room_router.post(
@@ -108,12 +66,13 @@ def get_room_service() -> RoomService:
 )
 async def configurar_sala(
     dados: ConfigurarEntrevistaRequest,
-    user_id: Annotated[str, Depends(get_optional_user)],
+    user_id: Annotated[str, Depends(get_current_user)],
     service: Annotated[RoomService, Depends(get_room_service)],
 ):
     """
     Cria uma nova sessão de entrevista no Supabase e retorna o room_id.
     O front-end (SetupScreen) armazena o room_id e o passa para o WebSocket.
+    Requer header Authorization: Bearer <token>.
     """
     try:
         room_id = await service.criar_sala(config=dados, user_id=user_id)
@@ -124,14 +83,14 @@ async def configurar_sala(
     return SetupResponse(room_id=room_id, config=dados)
 
 
-# ── WS /room/{room_id}/entrevista ─────────────────────────────────────────────
+#WS /room/{room_id}/entrevista
 
 
 @room_router.websocket("/{room_id}/entrevista")
 async def iniciar_entrevista(
     ws: WebSocket,
     room_id: int,
-    user_id: Annotated[str, Depends(get_optional_ws_user)],
+    user_id: Annotated[str, Depends(get_ws_user)],
     service: Annotated[RoomService, Depends(get_room_service)],
 ):
     """
@@ -179,7 +138,7 @@ async def iniciar_entrevista(
         analogia=config_extra.get("analogy"),
     )
 
-    # ── IA abre a entrevista com a primeira pergunta ───────────────────────
+    # IA abre a entrevista com a primeira pergunta
     try:
         abertura_texto = await service.llm.chamar_llm(historico_sessao)
         historico_sessao.append({"role": "assistant", "content": abertura_texto})
@@ -196,7 +155,7 @@ async def iniciar_entrevista(
 
     await ws.send_json({"type": "done"})
 
-    # ── Loop principal de áudio ────────────────────────────────────────────
+    #Loop principal de áudio
     detector_vad = voice_pipeline.VADDetector()
 
     try:
@@ -223,7 +182,7 @@ async def iniciar_entrevista(
                 await ws.send_json({"type": "done"})
                 continue
 
-            # Eco textual — útil para debug e exibição opcional na UI
+            # Eco textual útil para debug e exibição opcional na UI
             await ws.send_json({"type": "transcript", "text": texto_usuario})
 
             service.salvar_mensagem(room_id, "user", texto_usuario)
@@ -252,13 +211,13 @@ async def iniciar_entrevista(
         print(f"🔌 Cliente desconectado da sala {room_id}.")
 
 
-# ── POST /room/{room_id}/encerrar ─────────────────────────────────────────────
+# POST /room/{room_id}/encerrar
 
 
 @room_router.post("/{room_id}/encerrar", response_model=FeedbackResponse)
 async def encerrar_entrevista(
     room_id: int,
-    user_id: Annotated[str, Depends(get_optional_user)],
+    user_id: Annotated[str, Depends(get_current_user)],
     service: Annotated[RoomService, Depends(get_room_service)],
 ):
     """
@@ -277,15 +236,15 @@ async def encerrar_entrevista(
         ) from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Erro inesperado: {exc}") from exc
+    
 
-
-# ── GET /room/{room_id}/relatorio ─────────────────────────────────────────────
+# GET /room/{room_id}/relatorio
 
 
 @room_router.get("/{room_id}/relatorio", response_model=ReportResponse)
 async def obter_relatorio(
     room_id: int,
-    user_id: Annotated[str, Depends(get_optional_user)],
+    user_id: Annotated[str, Depends(get_current_user)],
     service: Annotated[RoomService, Depends(get_room_service)],
 ):
     """
