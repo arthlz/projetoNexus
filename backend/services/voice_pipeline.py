@@ -40,7 +40,7 @@ DEEPGRAM_STT_LANG_MAP: dict[str, str] = {
 
 # Código Nexus → modelo de voz Deepgram TTS
 DEEPGRAM_TTS_VOICE_MAP: dict[str, str] = {
-    "pt": "aura-asteria-en",
+    "en": "aura-asteria-en",
     "en": "aura-asteria-en",
 }
 
