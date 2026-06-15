@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
-// ─── Tipos do protocolo Nexus ────────────────────────────────────────────────
+//Tipos do protocolo Nexus
 
 export type WsStatus = "idle" | "connecting" | "open" | "closed" | "error";
 
@@ -69,45 +70,58 @@ export function useWebSocket({
     setStatus("closed");
   }, []);
 
-  const connect = useCallback(() => {
+  const connect = useCallback(async () => {
     // Evita abrir conexão duplicada
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
     setStatus("connecting");
     setError(null);
 
-    const url = `${WS_BASE_URL}/room/${roomId}/entrevista?token=${token}`;
-    const ws = new WebSocket(url);
+    try {
+      // 1. Busca a sessão do usuário no Supabase
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      // 2. Extrai o token de acesso (JWT) ou usa o fallback caso dê erro
+      const authToken = session?.access_token || token;
 
-    ws.onopen = () => setStatus("open");
+      // 3. Monta a URL injetando o token de autenticação
+      const url = `${WS_BASE_URL}/room/${roomId}/entrevista?token=${authToken}`;
+      const ws = new WebSocket(url);
 
-    ws.onmessage = (event: MessageEvent) => {
-      // Áudio MP3 chega como Blob/ArrayBuffer; JSON chega como string
-      if (event.data instanceof Blob) {
-        event.data.arrayBuffer().then((buf) => onAudioChunkRef.current(buf));
-      } else if (event.data instanceof ArrayBuffer) {
-        onAudioChunkRef.current(event.data);
-      } else if (typeof event.data === "string") {
-        try {
-          const msg = JSON.parse(event.data) as ServerMessage;
-          onMessageRef.current(msg);
-        } catch {
-          // mensagem mal-formada — ignorar silenciosamente
+      ws.onopen = () => setStatus("open");
+
+      ws.onmessage = (event: MessageEvent) => {
+        // Áudio MP3 chega como Blob/ArrayBuffer; JSON chega como string
+        if (event.data instanceof Blob) {
+          event.data.arrayBuffer().then((buf) => onAudioChunkRef.current(buf));
+        } else if (event.data instanceof ArrayBuffer) {
+          onAudioChunkRef.current(event.data);
+        } else if (typeof event.data === "string") {
+          try {
+            const msg = JSON.parse(event.data) as ServerMessage;
+            onMessageRef.current(msg);
+          } catch {
+            // mensagem mal-formada — ignorar silenciosamente
+          }
         }
-      }
-    };
+      };
 
-    ws.onerror = () => {
+      ws.onerror = () => {
+        setStatus("error");
+        setError("Erro na conexão com o servidor de entrevistas.");
+      };
+
+      ws.onclose = () => {
+        setStatus("closed");
+        wsRef.current = null;
+      };
+
+      wsRef.current = ws;
+    } catch (err) {
+      console.error("Erro ao obter sessão para o WebSocket:", err);
       setStatus("error");
-      setError("Erro na conexão com o servidor de entrevistas.");
-    };
-
-    ws.onclose = () => {
-      setStatus("closed");
-      wsRef.current = null;
-    };
-
-    wsRef.current = ws;
+      setError("Falha de autenticação ao conectar na sala.");
+    }
   }, [roomId, token]);
 
   const sendFrame = useCallback((pcmFrame: ArrayBuffer) => {
