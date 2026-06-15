@@ -20,7 +20,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 
 from backend.core.database import get_db
 from backend.core.exceptions import InvalidFeedbackError, LLMError
-from backend.routes.room_routes import get_optional_user
+from backend.middleware.auth import get_current_user
 from backend.schemas.ats_schemas import ATSAnalysisResponse, ATSHistoryResponse
 from backend.services.ats_service import ATSService
 from backend.services.llm_service import LLMService
@@ -47,7 +47,7 @@ async def analisar_curriculo(
         str | None,
         Form(description="Descrição da vaga (opcional)"),
     ] = None,
-    user_id: Annotated[str, Depends(get_optional_user)] = "dev-user-placeholder",
+    user_id: Annotated[str, Depends(get_current_user)] = "dev-user-placeholder",
     service: Annotated[ATSService, Depends(get_ats_service)] = None,
 ):
     """
@@ -105,7 +105,7 @@ async def analisar_curriculo(
 def historico_analises(
     limit:   int = Query(default=10, ge=1, le=50),
     offset:  int = Query(default=0,  ge=0),
-    user_id: Annotated[str, Depends(get_optional_user)] = "dev-user-placeholder",
+    user_id: Annotated[str, Depends(get_current_user)] = "dev-user-placeholder",
     service: Annotated[ATSService, Depends(get_ats_service)] = None,
 ):
     """
