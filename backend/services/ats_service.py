@@ -97,7 +97,7 @@ class ATSService:
         analyses = [self._row_to_response(row) for row in (result.data or [])]
         return ATSHistoryResponse(analyses=analyses, total=total)
 
-    # ── Helpers privados ──────────────────────────────────────────────────────
+    #Helpers privados
 
     def _extrair_texto_pdf(self, pdf_bytes: bytes) -> str:
         """
