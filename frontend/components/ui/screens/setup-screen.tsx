@@ -1,6 +1,5 @@
 "use client"
 
-import { supabase } from "@/lib/supabase"
 import { useState } from "react"
 import { Play, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
