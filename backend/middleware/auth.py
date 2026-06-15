@@ -1,11 +1,6 @@
 """
-
 Validação de JWT emitido pelo Supabase Auth.
 
-Por que validar no back-end e não confiar no front-end?
-  O front-end envia um JWT após o login no Supabase. Sem validação no
-  back-end, qualquer pessoa que descubra um room_id pode acessar ou
-  encerrar a sessão de outro usuário — a pendência crítica da doc original.
 
 Fluxo:
   1. Front-end faz login via supabase.auth → recebe access_token (JWT).
@@ -13,10 +8,6 @@ Fluxo:
   3. Este módulo decodifica e valida a assinatura usando SUPABASE_JWT_SECRET.
   4. O user_id extraído do sub do token é injetado nas rotas via Depends().
 
-Para WebSocket:
-  O protocolo WS não suporta headers customizados no browser. A solução
-  padrão é passar o token como query param: ?token=<jwt>
-  O helper get_ws_user() lida com esse caso.
 """
 
 from fastapi import Depends, Query
