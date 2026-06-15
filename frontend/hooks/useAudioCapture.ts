@@ -10,15 +10,29 @@ export interface UseAudioCaptureReturn {
   startCapture: () => Promise<void>;
   /** Para a captura e libera o microfone */
   stopCapture: () => void;
+  /**
+   * Silencia ou desmuta o microfone sem interromper a captura.
+   * Quando mutado, frames de silêncio (zeros) são enviados ao invés do áudio real.
+   */
+  setMuted: (muted: boolean) => void;
+  /**
+   * Pausa ou retoma o envio de frames ao backend.
+   * Quando pausado, nenhum frame é enviado (diferente de mute que envia silêncio).
+   */
+  setPaused: (paused: boolean) => void;
 }
 
 export function useAudioCapture(
   onFrame: (pcmFrame: ArrayBuffer) => void
 ): UseAudioCaptureReturn {
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const processorRef = useRef<ScriptProcessorNode | null>(null);
-  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const audioCtxRef   = useRef<AudioContext | null>(null);
+  const streamRef     = useRef<MediaStream | null>(null);
+  const processorRef  = useRef<ScriptProcessorNode | null>(null);
+  const sourceRef     = useRef<MediaStreamAudioSourceNode | null>(null);
+
+  // Flags de controle — usamos refs para evitar stale closures no onaudioprocess
+  const isMutedRef  = useRef(false);
+  const isPausedRef = useRef(false);
 
   const stopCapture = useCallback(() => {
     processorRef.current?.disconnect();
@@ -27,9 +41,9 @@ export function useAudioCapture(
     audioCtxRef.current?.close();
 
     processorRef.current = null;
-    sourceRef.current = null;
-    streamRef.current = null;
-    audioCtxRef.current = null;
+    sourceRef.current    = null;
+    streamRef.current    = null;
+    audioCtxRef.current  = null;
   }, []);
 
   const startCapture = useCallback(async () => {
@@ -47,13 +61,24 @@ export function useAudioCapture(
     const source = ctx.createMediaStreamSource(stream);
     sourceRef.current = source;
 
-    // (AudioWorklet seria o ideal, mas ScriptProcessor funciona em todos os
-    //  browsers suportados pelo Next.js sem necessidade de worklet separado)
+    // ScriptProcessor funciona em todos os browsers suportados pelo Next.js
+    // sem necessidade de worklet separado
     const processor = ctx.createScriptProcessor(FRAME_SIZE, 1, 1);
     processorRef.current = processor;
 
     processor.onaudioprocess = (e: AudioProcessingEvent) => {
+      // Pausado: não envia nenhum frame ao backend
+      if (isPausedRef.current) return;
+
       const float32 = e.inputBuffer.getChannelData(0);
+
+      // Mutado: envia frame de silêncio (zeros) para manter o stream ativo
+      // sem transmitir áudio do usuário
+      if (isMutedRef.current) {
+        const silence = new Int16Array(float32.length); // já inicializado com zeros
+        onFrame(silence.buffer);
+        return;
+      }
 
       // Converte Float32 [-1, 1] → Int16 PCM
       const int16 = new Int16Array(float32.length);
@@ -69,5 +94,8 @@ export function useAudioCapture(
     processor.connect(ctx.destination);
   }, [onFrame, stopCapture]);
 
-  return { startCapture, stopCapture };
+  const setMuted  = useCallback((muted: boolean)  => { isMutedRef.current  = muted;  }, []);
+  const setPaused = useCallback((paused: boolean) => { isPausedRef.current = paused; }, []);
+
+  return { startCapture, stopCapture, setMuted, setPaused };
 }

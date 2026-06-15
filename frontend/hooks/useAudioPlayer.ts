@@ -31,7 +31,8 @@ export function useAudioPlayer(): UseAudioPlayerReturn {
     return audioCtxRef.current;
   }, []);
 
-  const playNext = useCallback(async () => {
+
+  const playNext = useCallback(async function processNext() {
     if (isPlayingRef.current || queueRef.current.length === 0) return;
 
     const chunk = queueRef.current.shift()!;
@@ -40,7 +41,6 @@ export function useAudioPlayer(): UseAudioPlayerReturn {
     try {
       const ctx = getAudioContext();
 
-      // Retoma o contexto se estiver suspenso (política de autoplay dos browsers)
       if (ctx.state === "suspended") await ctx.resume();
 
       const audioBuffer = await ctx.decodeAudioData(chunk.slice(0));
@@ -50,14 +50,13 @@ export function useAudioPlayer(): UseAudioPlayerReturn {
 
       source.onended = () => {
         isPlayingRef.current = false;
-        playNext(); // processa o próximo da fila
+        processNext(); // Usa o nome interno da função para a recursão
       };
 
       source.start();
     } catch {
-      // Chunk inválido ou contexto fechado — descarta e tenta o próximo
       isPlayingRef.current = false;
-      playNext();
+      processNext(); // Usa o nome interno da função para a recursão
     }
   }, [getAudioContext]);
 

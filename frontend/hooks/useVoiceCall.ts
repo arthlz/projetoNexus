@@ -4,55 +4,55 @@ import { useAudioPlayer } from "./useAudioPlayer";
 import { useWebSocket, type ServerMessage } from "./useWebSocket";
 
 /**
- * Orquestrador fino: compõe useWebSocket + useAudioCapture + useAudioPlayer
- * e expõe apenas a interface de alto nível que os componentes de UI precisam.
+ * useVoiceCall
  *
- * Cada responsabilidade vive em seu próprio hook:
- *  - useWebSocket   → conexão e protocolo WS
- *  - useAudioCapture → captura do microfone e emissão de frames PCM
- *  - useAudioPlayer  → fila de reprodução dos chunks MP3 da IA
+ * Orquestrador de alto nível: compõe useWebSocket + useAudioCapture + useAudioPlayer
+ * e expõe a interface que o CallScreen precisa.
  *
- * Este hook só gerencia estado de UI (status, transcript, errorMessage)
- * e a sequência de inicialização/encerramento.
+ * Contrato da API pública:
+ *  - startCall()           → abre WS + inicia captura de microfone
+ *  - stopCall()            → encerra tudo e libera recursos
+ *  - toggleMuteAudio(bool) → silencia/desmuta o microfone sem parar a captura
+ *  - togglePauseAudio(bool)→ pausa/retoma o envio de frames ao backend
+ *  - isAISpeaking          → true enquanto a IA está respondendo em áudio
  */
 
-// ─── Tipos públicos do hook ───────────────────────────────────────────────────
+// ─── Tipos internos ───────────────────────────────────────────────────────────
 
-export type CallStatus =
-  | "idle"        // antes de qualquer ação
-  | "connecting"  // aguardando WS abrir + permissão de microfone
-  | "active"      // entrevista em andamento
-  | "ai_speaking" // IA está respondendo (microfone pausado)
-  | "ended"       // entrevista encerrada normalmente
-  | "error";      // falha irrecuperável
-
-export interface TranscriptEntry {
-  speaker: "user" | "ai";
-  text: string;
-}
+type CallStatus =
+  | "idle"
+  | "connecting"
+  | "active"
+  | "ai_speaking"
+  | "ended"
+  | "error";
 
 export interface UseVoiceCallReturn {
-  /** Estado atual da chamada */
-  status: CallStatus;
-  /** Histórico de transcrições da entrevista */
-  transcript: TranscriptEntry[];
-  /** Mensagem de erro legível, se status === "error" */
-  errorMessage: string | null;
-  /** Inicia a entrevista: abre WS e começa captura de microfone */
-  startInterview: () => Promise<void>;
-  /** Encerra a entrevista e libera todos os recursos */
-  endInterview: () => void;
+  /** Inicia a chamada: abre WS e começa captura de microfone */
+  startCall: () => Promise<void>;
+  /** Encerra a chamada e libera todos os recursos */
+  stopCall: () => void;
+  /**
+   * Controla o mute do microfone.
+   * true  → envia silêncio ao backend (stream mantido ativo)
+   * false → retoma envio do áudio real
+   */
+  toggleMuteAudio: (muted: boolean) => void;
+  /**
+   * Controla a pausa do envio de frames.
+   * true  → para completamente o envio de frames (microfone continua capturando)
+   * false → retoma o envio
+   */
+  togglePauseAudio: (paused: boolean) => void;
+  /** true enquanto a IA está reproduzindo áudio de resposta */
+  isAISpeaking: boolean;
 }
 
-interface Options {
-  roomId: string;
-  token: string;
-}
-
-export function useVoiceCall({ roomId, token }: Options): UseVoiceCallReturn {
+export function useVoiceCall(roomId: string): UseVoiceCallReturn {
   const [status, setStatus] = useState<CallStatus>("idle");
-  const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Token fixo por enquanto — substituir por prop ou contexto de autenticação
+  const token = "";
 
   // ── Player de áudio ────────────────────────────────────────────────────────
   const { enqueueChunk, flush: flushAudio } = useAudioPlayer();
@@ -61,15 +61,15 @@ export function useVoiceCall({ roomId, token }: Options): UseVoiceCallReturn {
   const handleMessage = useCallback((msg: ServerMessage) => {
     switch (msg.type) {
       case "transcript":
-        setTranscript((prev) => [...prev, { speaker: "ai", text: msg.text }]);
+        // Disponível para extensão futura (ex: exibir transcrição na UI)
         break;
       case "done":
-        // IA terminou de falar — devolve o microfone ao usuário
+        // IA terminou de falar — volta ao estado ativo
         setStatus("active");
         break;
       case "error":
-        setErrorMessage(msg.text);
-        // Erros não-fatais: mantém a entrevista ativa
+        // Erros não-fatais: loga mas mantém a chamada ativa
+        console.error("[useVoiceCall] erro do backend:", msg.text);
         break;
     }
   }, []);
@@ -83,7 +83,7 @@ export function useVoiceCall({ roomId, token }: Options): UseVoiceCallReturn {
   );
 
   // ── WebSocket ──────────────────────────────────────────────────────────────
-  const { connect, disconnect, sendFrame, error: wsError } = useWebSocket({
+  const { connect, disconnect, sendFrame } = useWebSocket({
     roomId,
     token,
     onMessage: handleMessage,
@@ -91,44 +91,40 @@ export function useVoiceCall({ roomId, token }: Options): UseVoiceCallReturn {
   });
 
   // ── Captura de áudio ───────────────────────────────────────────────────────
-  const { startCapture, stopCapture } = useAudioCapture(sendFrame);
+  const { startCapture, stopCapture, setMuted, setPaused } =
+    useAudioCapture(sendFrame);
 
   // ── API pública ────────────────────────────────────────────────────────────
 
-  const startInterview = useCallback(async () => {
-    setStatus("connecting");
-    setTranscript([]);
-    setErrorMessage(null);
+  const startCall = useCallback(async () => {
+    if (status === "connecting" || status === "active") return;
 
+    setStatus("connecting");
     try {
       connect();
       await startCapture();
       setStatus("active");
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Falha ao iniciar entrevista.";
-      setErrorMessage(msg);
+      console.error("[useVoiceCall] falha ao iniciar:", err);
       setStatus("error");
     }
-  }, [connect, startCapture]);
+  }, [status, connect, startCapture]);
 
-  const endInterview = useCallback(() => {
+  const stopCall = useCallback(() => {
     stopCapture();
     disconnect();
     flushAudio();
     setStatus("ended");
   }, [stopCapture, disconnect, flushAudio]);
 
-  // Repassa erro de WS para o estado de UI
-  if (wsError && status !== "error") {
-    setErrorMessage(wsError);
-    setStatus("error");
-  }
+  const toggleMuteAudio  = useCallback((muted: boolean)  => setMuted(muted),   [setMuted]);
+  const togglePauseAudio = useCallback((paused: boolean) => setPaused(paused), [setPaused]);
 
   return {
-    status,
-    transcript,
-    errorMessage,
-    startInterview,
-    endInterview,
+    startCall,
+    stopCall,
+    toggleMuteAudio,
+    togglePauseAudio,
+    isAISpeaking: status === "ai_speaking",
   };
 }
