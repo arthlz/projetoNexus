@@ -1,6 +1,4 @@
 """
-main.py
-───────
 Ponto de entrada da aplicação FastAPI.
 
 Responsabilidades:
@@ -11,10 +9,6 @@ Responsabilidades:
   4. Incluir os roteadores de cada domínio.
   5. Expor endpoint de healthcheck.
 
-Por que handlers globais e não try/except em cada rota?
-  Centralizar o mapeamento exceção → HTTP evita duplicação e garante
-  que qualquer erro de domínio não tratado numa rota seja convertido
-  consistentemente em vez de resultar num HTTP 500 genérico.
 """
 
 from fastapi import FastAPI, Request
@@ -32,6 +26,7 @@ from backend.core.exceptions import (
     UnauthorizedError,
 )
 from backend.routes.room_routes import room_router
+from backend.routes.ats_routes import ats_router
 
 settings = get_settings()
 
@@ -39,15 +34,14 @@ app = FastAPI(
     title="Nexus API",
     description="Back-end da plataforma de simulação de entrevistas técnicas com IA.",
     version="2.0.0",
-    # Desabilita docs em produção (evita exposição de schema)
+
+    # Desabilita docs em produção 
     docs_url=None if settings.is_production else "/docs",
     redoc_url=None if settings.is_production else "/redoc",
 )
 
-# ── CORS ─────────────────────────────────────────────────────────────────────
-# Origens lidas do .env — sem hardcode.
-# Em desenvolvimento: http://localhost:3000
-# Em produção: URL do Vercel / domínio customizado
+#CORS 
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.origins_list,
@@ -56,7 +50,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── Exception handlers globais ────────────────────────────────────────────────
+#xception handlers 
 
 
 @app.exception_handler(UnauthorizedError)
@@ -87,13 +81,13 @@ async def nexus_base_handler(request: Request, exc: NexusBaseError):
     return JSONResponse(status_code=500, content={"detail": str(exc)})
 
 
-# ── Routers ───────────────────────────────────────────────────────────────────
+#Routers
 
 app.include_router(room_router)
+app.include_router(ats_router)
 
 
-# ── Healthcheck ───────────────────────────────────────────────────────────────
-
+# Healthcheck 
 
 @app.get("/", tags=["health"])
 async def root():
@@ -106,5 +100,4 @@ async def root():
 
 @app.get("/health", tags=["health"])
 async def health():
-    """Endpoint para load balancers e ferramentas de monitoramento."""
     return {"status": "ok"}
