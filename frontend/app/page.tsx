@@ -14,7 +14,7 @@ import { ResumeScreen }    from "@/components/ui/screens/resume-screen"
 import { ProfileScreen }   from "@/components/ui/screens/profile-screen"
 import { RegisterScreen }  from "@/components/ui/screens/register-screen"
 
-const API_BASE = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://localhost:8000"
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 
 export default function NexusApp() {
   const [currentScreen, setCurrentScreen] = useState<Screen>("login")
