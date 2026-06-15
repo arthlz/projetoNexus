@@ -1,5 +1,6 @@
 "use client"
 
+import { supabase } from "@/lib/supabase"
 import { useState } from "react"
 import { Play, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -22,11 +23,18 @@ export const SetupScreen = ({ language, setLanguage, onStart }: SetupScreenProps
   const handleStartInterview = async () => {
     setIsLoading(true)
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';;
+      // 1. Pegar o Token da sessão ativa do Supabase
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
+      
       const response = await fetch(`${API_URL}/room/setup`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          // 2. Enviar o token de Autorização para o backend
+          "Authorization": `Bearer ${token}` 
         },
         body: JSON.stringify({
           role,
@@ -50,6 +58,8 @@ export const SetupScreen = ({ language, setLanguage, onStart }: SetupScreenProps
     } catch (error) {
       console.error("Erro ao configurar a sala:", error)
       alert("❌ Erro ao conectar com o backend. Verifique se ele está rodando.")
+    } finally {
+      setIsLoading(false)
     }
   }
 
