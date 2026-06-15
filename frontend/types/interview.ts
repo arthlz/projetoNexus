@@ -21,3 +21,18 @@ export interface InterviewHistory {
   feedback: string;
   date: string;
 }
+
+export interface RelatorioAPIResponse {
+  room_id: number;
+  role: string;
+  level?: string;
+  persona?: string;
+  company?: string | null;
+  language?: string;
+  date?: string;
+  score?: number | null;
+  tech?: number | null;
+  comm?: number | null;
+  soft?: number | null;
+  feedback?: string | null;
+}
