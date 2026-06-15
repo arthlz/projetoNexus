@@ -71,11 +71,13 @@ async def get_ws_user(token: str = Query(..., description="JWT do Supabase")) ->
     """
     try:
         payload = _decode_token(token)
+        user_id: str | None = payload.get("sub")
+        if not user_id:
+            raise UnauthorizedError("Token WS não contém campo 'sub'.")
+        return user_id
+
     except UnauthorizedError as exc:
         # WebSocket não lança HTTPException, só fecha a conexão
         raise exc
 
-    user_id: str | None = payload.get("sub")
-    if not user_id:
-        raise UnauthorizedError("Token WS não contém campo 'sub'.")
-    return user_id
+    
