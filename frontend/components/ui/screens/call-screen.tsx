@@ -1,9 +1,8 @@
-
 "use client"
 
 import { useState, useEffect } from "react"
 import { Mic, MicOff, Pause, Paperclip, Brain, Upload, FileText, X, Loader2 } from "lucide-react"
-import { Button }   from "@/components/ui/button"
+import { Button } from "@/components/ui/button"
 import {
   Dialog, DialogContent, DialogDescription,
   DialogHeader, DialogTitle, DialogTrigger,
@@ -21,40 +20,92 @@ interface CallScreenProps {
 }
 
 export const CallScreen = ({
-  roomId, isMuted, setIsMuted, isPaused, setIsPaused, onEnd, isEndingCall,
+  roomId,
+  isMuted,
+  setIsMuted,
+  isPaused,
+  setIsPaused,
+  onEnd,
+  isEndingCall,
 }: CallScreenProps) => {
   const { startCall, stopCall, toggleMuteAudio, togglePauseAudio, isAISpeaking } =
     useVoiceCall(roomId)
 
-  const [callTime,        setCallTime]        = useState(0)
-  const [codeDialogOpen,  setCodeDialogOpen]  = useState(false)
-  const [pdfCallName,     setPdfCallName]     = useState<string | null>(null)
+  const [callTime,       setCallTime]       = useState(0)
+  const [codeDialogOpen, setCodeDialogOpen] = useState(false)
+  const [pdfCallName,    setPdfCallName]    = useState<string | null>(null)
 
-  // Inicia a chamada ao montar o componente
+  // ── Ciclo de vida da chamada ───────────────────────────────────────────────
   useEffect(() => {
     if (roomId) startCall()
     return () => { stopCall() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId])
 
-  // Sincroniza mute/pause com o hook
-  useEffect(() => { toggleMuteAudio(isMuted)   }, [isMuted,  toggleMuteAudio])
-  useEffect(() => { togglePauseAudio(isPaused)  }, [isPaused, togglePauseAudio])
+  // ── Sincroniza mute com o hook ─────────────────────────────────────────────
+  // O estado canônico de isMuted/isPaused vive no componente pai;
+  // o hook é notificado via toggleMuteAudio/togglePauseAudio para aplicar
+  // o efeito real no stream de áudio.
+  useEffect(() => {
+    toggleMuteAudio(isMuted)
+  }, [isMuted, toggleMuteAudio])
 
-  // Timer
+  useEffect(() => {
+    togglePauseAudio(isPaused)
+  }, [isPaused, togglePauseAudio])
+
+  // ── Timer ──────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (isPaused) return
     const id = setInterval(() => setCallTime((t) => t + 1), 1000)
     return () => clearInterval(id)
   }, [isPaused])
 
+  // ── Handlers ───────────────────────────────────────────────────────────────
   const handleEndCall = () => {
     stopCall()
     onEnd()
   }
 
+  const handleMuteToggle = () => {
+    if (isAISpeaking || isEndingCall) return
+    setIsMuted(!isMuted)
+  }
+
+  const handlePauseToggle = () => {
+    if (isEndingCall) return
+    setIsPaused(!isPaused)
+  }
+
   const formatTime = (s: number) =>
     `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`
+
+  // ── Status label ───────────────────────────────────────────────────────────
+  const statusLabel = isEndingCall
+    ? "Gerando feedback…"
+    : isAISpeaking
+      ? "IA falando"
+      : isPaused
+        ? "Pausado"
+        : isMuted
+          ? "Mutado"
+          : "Gravando"
+
+  const statusColor = isAISpeaking
+    ? "text-cyan-400"
+    : isPaused
+      ? "text-yellow-400"
+      : isMuted
+        ? "text-orange-400"
+        : "text-red-400"
+
+  const dotColor = isAISpeaking
+    ? "bg-cyan-400"
+    : isPaused
+      ? "bg-yellow-400"
+      : isMuted
+        ? "bg-orange-400"
+        : "bg-red-500 animate-pulse"
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex flex-col">
@@ -63,9 +114,9 @@ export const CallScreen = ({
       <div className="flex items-center justify-between p-6">
         <span className="text-white text-2xl font-mono">{formatTime(callTime)}</span>
         <div className="flex items-center gap-2">
-          <div className={`w-3 h-3 rounded-full ${isAISpeaking ? "bg-cyan-400" : "bg-red-500 animate-pulse"}`} />
-          <span className={`text-sm font-medium ${isAISpeaking ? "text-cyan-400" : "text-red-400"}`}>
-            {isEndingCall ? "Gerando feedback…" : isAISpeaking ? "IA falando" : isPaused ? "Pausado" : "Gravando"}
+          <div className={`w-3 h-3 rounded-full ${dotColor}`} />
+          <span className={`text-sm font-medium ${statusColor}`}>
+            {statusLabel}
           </span>
         </div>
       </div>
@@ -73,11 +124,19 @@ export const CallScreen = ({
       {/* Orb central */}
       <div className="flex-1 flex items-center justify-center">
         <div className="relative">
-          <div className={`w-48 h-48 rounded-full bg-gradient-to-br from-violet-500 to-cyan-500 absolute -inset-4 blur-xl
-            ${isAISpeaking ? "opacity-40 animate-pulse" : "opacity-20"}`} />
+          <div
+            className={`w-48 h-48 rounded-full bg-gradient-to-br from-violet-500 to-cyan-500 absolute -inset-4 blur-xl
+              ${isAISpeaking ? "opacity-40 animate-pulse" : "opacity-20"}`}
+          />
           <div className="w-40 h-40 rounded-full bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center relative">
-            <div className={`w-32 h-32 rounded-full bg-gradient-to-br from-violet-600 to-cyan-600
-              ${isAISpeaking ? "animate-pulse" : !isPaused ? "animate-[pulse_3s_ease-in-out_infinite]" : ""}`} />
+            <div
+              className={`w-32 h-32 rounded-full bg-gradient-to-br from-violet-600 to-cyan-600
+                ${isAISpeaking
+                  ? "animate-pulse"
+                  : !isPaused
+                    ? "animate-[pulse_3s_ease-in-out_infinite]"
+                    : ""}`}
+            />
             <div className="absolute inset-0 flex items-center justify-center">
               <Brain className="w-16 h-16 text-white" />
             </div>
@@ -91,11 +150,16 @@ export const CallScreen = ({
 
           {/* Mute */}
           <Button
-            variant="ghost" size="icon"
-            onClick={() => setIsMuted(!isMuted)}
+            variant="ghost"
+            size="icon"
+            onClick={handleMuteToggle}
             disabled={isAISpeaking || isEndingCall}
+            aria-label={isMuted ? "Desmutar microfone" : "Mutar microfone"}
+            aria-pressed={isMuted}
             className={`w-12 h-12 rounded-full
-              ${isMuted || isAISpeaking ? "bg-red-500/20 text-red-400" : "bg-white/10 text-white"}
+              ${isMuted || isAISpeaking
+                ? "bg-red-500/20 text-red-400"
+                : "bg-white/10 text-white"}
               hover:bg-white/20 disabled:opacity-40`}
           >
             {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
@@ -103,11 +167,16 @@ export const CallScreen = ({
 
           {/* Pause */}
           <Button
-            variant="ghost" size="icon"
-            onClick={() => setIsPaused(!isPaused)}
+            variant="ghost"
+            size="icon"
+            onClick={handlePauseToggle}
             disabled={isEndingCall}
+            aria-label={isPaused ? "Retomar entrevista" : "Pausar entrevista"}
+            aria-pressed={isPaused}
             className={`w-12 h-12 rounded-full
-              ${isPaused ? "bg-yellow-500/20 text-yellow-400" : "bg-white/10 text-white"}
+              ${isPaused
+                ? "bg-yellow-500/20 text-yellow-400"
+                : "bg-white/10 text-white"}
               hover:bg-white/20 disabled:opacity-40`}
           >
             <Pause className="w-5 h-5" />
@@ -117,8 +186,10 @@ export const CallScreen = ({
           <Dialog open={codeDialogOpen} onOpenChange={setCodeDialogOpen}>
             <DialogTrigger asChild>
               <Button
-                variant="ghost" size="icon"
+                variant="ghost"
+                size="icon"
                 disabled={isEndingCall}
+                aria-label="Enviar código em PDF"
                 className="w-12 h-12 rounded-full bg-white/10 text-white hover:bg-white/20 disabled:opacity-40"
               >
                 <Paperclip className="w-5 h-5" />
@@ -140,8 +211,11 @@ export const CallScreen = ({
                     <div className="flex items-center gap-2 text-foreground">
                       <FileText className="w-6 h-6 text-cyan-500" />
                       <span className="font-medium">{pdfCallName}</span>
-                      <button onClick={(e) => { e.preventDefault(); setPdfCallName(null) }}
-                        className="ml-2 p-1 hover:bg-muted rounded-full">
+                      <button
+                        onClick={(e) => { e.preventDefault(); setPdfCallName(null) }}
+                        className="ml-2 p-1 hover:bg-muted rounded-full"
+                        aria-label="Remover arquivo"
+                      >
                         <X className="w-4 h-4 text-muted-foreground" />
                       </button>
                     </div>
@@ -151,12 +225,19 @@ export const CallScreen = ({
                       <span className="text-sm text-muted-foreground">Clique para selecionar PDF</span>
                     </>
                   )}
-                  <input id="code-upload" type="file" accept=".pdf" className="hidden"
-                    onChange={(e) => setPdfCallName(e.target.files?.[0]?.name ?? null)} />
+                  <input
+                    id="code-upload"
+                    type="file"
+                    accept=".pdf"
+                    className="hidden"
+                    onChange={(e) => setPdfCallName(e.target.files?.[0]?.name ?? null)}
+                  />
                 </label>
-                <Button onClick={() => setCodeDialogOpen(false)}
+                <Button
+                  onClick={() => setCodeDialogOpen(false)}
                   className="w-full bg-cyan-500 hover:bg-cyan-600 text-slate-900"
-                  disabled={!pdfCallName}>
+                  disabled={!pdfCallName}
+                >
                   Enviar
                 </Button>
               </div>
@@ -169,9 +250,14 @@ export const CallScreen = ({
             disabled={isEndingCall}
             className="px-6 h-12 rounded-full bg-red-500 hover:bg-red-600 text-white font-medium disabled:opacity-60"
           >
-            {isEndingCall
-              ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Processando…</>
-              : "Encerrar"}
+            {isEndingCall ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                Processando…
+              </>
+            ) : (
+              "Encerrar"
+            )}
           </Button>
 
         </div>
