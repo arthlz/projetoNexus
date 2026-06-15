@@ -19,7 +19,7 @@ Para WebSocket:
   O helper get_ws_user() lida com esse caso.
 """
 
-from fastapi import Depends, HTTPException, Query, status
+from fastapi import Depends, Query
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 
