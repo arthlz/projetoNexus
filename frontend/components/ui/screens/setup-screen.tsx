@@ -23,7 +23,7 @@ export const SetupScreen = ({ language, setLanguage, onStart }: SetupScreenProps
   const handleStartInterview = async () => {
     setIsLoading(true)
     try {
-      const API_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://localhost:8000';
+      const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';;
       const response = await fetch(`${API_URL}/room/setup`, {
         method: "POST",
         headers: {
