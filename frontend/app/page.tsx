@@ -1,6 +1,7 @@
 
 "use client"
 
+import { supabase } from "@/lib/supabase";
 import { useState } from "react"
 import { Screen, InterviewHistory } from "@/types/interview"
 import { Sidebar }         from "@/components/ui/layout/sidebar"
@@ -13,6 +14,7 @@ import { ReportScreen }    from "@/components/ui/screens/report-screen"
 import { ResumeScreen }    from "@/components/ui/screens/resume-screen"
 import { ProfileScreen }   from "@/components/ui/screens/profile-screen"
 import { RegisterScreen }  from "@/components/ui/screens/register-screen"
+import { RelatorioAPIResponse } from "@/types/interview"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 
@@ -33,28 +35,37 @@ export default function NexusApp() {
     setCurrentScreen("report")
   }
 
-  // ── Encerramento real: chama /encerrar + /relatorio ───────────────────────
+  //Encerramento real: chama /encerrar + /relatorio 
   const handleEndCall = async () => {
     setIsEndingCall(true)
     try {
-      // 1. Gera o feedback via LLM
+      // 1. Pegar o Token
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      // 2. Adicionar o Authorization no encerramento
       const encerrarRes = await fetch(`${API_BASE}/room/${roomId}/encerrar`, {
         method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
       })
 
       if (!encerrarRes.ok) {
         console.error("Erro ao encerrar entrevista:", await encerrarRes.text())
-        // Fallback: vai para o relatório mesmo sem feedback
         setSelectedReport(buildFallbackReport())
         setCurrentScreen("report")
         return
       }
 
-      // 2. Busca o relatório completo (metadados + histórico + feedback)
-      const relatorioRes = await fetch(`${API_BASE}/room/${roomId}/relatorio`)
+      // 3. Adicionar o Authorization na busca do relatório
+      const relatorioRes = await fetch(`${API_BASE}/room/${roomId}/relatorio`, {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      })
 
       if (!relatorioRes.ok) {
-        // Usa o feedback do /encerrar diretamente como fallback
         const fb = await encerrarRes.json()
         setSelectedReport({
           id: Number(roomId),
@@ -84,9 +95,9 @@ export default function NexusApp() {
     }
   }
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
+  // Helpers 
 
-  function relatorioToHistory(r: any): InterviewHistory {
+  function relatorioToHistory(r: RelatorioAPIResponse): InterviewHistory {
     const company = r.company ? ` — ${r.company}` : ""
     return {
       id:       r.room_id,
