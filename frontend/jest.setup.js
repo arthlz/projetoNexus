@@ -22,7 +22,4 @@ if (typeof window !== 'undefined') {
     writable: true,
   });
 
-  // Mock de APIs modernas se necessário
-  global.TextEncoder = require('util').TextEncoder;
-  global.TextDecoder = require('util').TextDecoder;
 }
