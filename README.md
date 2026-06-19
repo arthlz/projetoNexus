@@ -12,7 +12,7 @@
 
 **Plataforma de simulação de entrevistas técnicas com IA conversacional por voz, feedback inteligente e análise de currículo ATS.**
 
-[Sobre o Projeto](#-sobre-o-projeto) • [Funcionalidades](#-funcionalidades) • [Arquitetura](#️-arquitetura) • [Como Rodar](#-como-rodar) • [Testes](#-testes) • [Equipe](#-equipe)
+[Sobre o Projeto](#-sobre-o-projeto) • [Funcionalidades](#-funcionalidades) • [Arquitetura](#️-arquitetura) • [Como Rodar](#-como-rodar) • [Deploy](#deploy) • [Testes](#-testes) • [Equipe](#-equipe)
 
 </div>
 
@@ -183,7 +183,7 @@ migrations/add_interview_support.sql
 
 ---
 
-## Como fazer deploy:
+## Deploy
 
 ### 1. Backend (Render)
 O Backend roda em Python (FastAPI) e gerencia as conexões WebSockets e requisições LLM. O Render é o ambiente ideal, pois mantém o processo rodando ativamente para os WebSockets, diferentemente de funções serverless.
