@@ -1,8 +1,7 @@
-# 🧠 Nexus — Simulador de Entrevistas Técnicas com IA
+# Nexus — Simulador de Entrevistas Técnicas com IA
 
 <div align="center">
 
-![Nexus Banner](https://img.shields.io/badge/Nexus-Simulador%20de%20Entrevistas-06b6d4?style=for-the-badge&logo=sparkles&logoColor=white)
 
 [![Next.js](https://img.shields.io/badge/Next.js-16-black?style=flat-square&logo=next.js)](https://nextjs.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.136-009688?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com/)
