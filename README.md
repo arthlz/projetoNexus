@@ -183,6 +183,70 @@ migrations/add_interview_support.sql
 
 ---
 
+## Como fazer deploy:
+
+### 1. Backend (Render)
+O Backend roda em Python (FastAPI) e gerencia as conexões WebSockets e requisições LLM. O Render é o ambiente ideal, pois mantém o processo rodando ativamente para os WebSockets, diferentemente de funções serverless.
+
+### 1.1 Configuração do Serviço
+No Render, crie um novo Web Service conectado ao repositório do GitHub do Nexus.
+
+Defina as seguintes configurações de build:
+
+```bash
+Build Command: pip install -r requirements.txt (ajuste o caminho se estiver dentro da pasta /backend).
+
+Start Command: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+```
+
+### 1.2 Variáveis de Ambiente (Environment)
+Configure as variáveis no Render prestando muita atenção na sintaxe (sem aspas desnecessárias):
+
+```bash
+ALLOWED_ORIGINS = http://localhost:3000,https://projeto-nexus-xi.vercel.app (Sem barra no final!)
+
+SUPABASE_URL = <Sua Project URL do Supabase>
+
+SUPABASE_SERVICE_ROLE_KEY = <Sua Service Role Key do Supabase>
+
+SUPABASE_JWT_SECRET = <Seu JWT Secret do Supabase>
+
+OPENROUTER_API_KEY = <Sua chave da API do OpenRouter>
+
+DEEPGRAM_API_KEY = <Sua chave da API do Deepgram>
+
+```
+(O backend agora valida os tokens usando o SDK próprio do Supabase para suportar os tokens ES256 emitidos nativamente, não precisando se preocupar com conflito HS256).
+
+### 2. Frontend (Vercel)
+O Frontend é desenvolvido em Next.js e deve ser hospedado na Vercel para máxima otimização e integração.
+
+### 2.1 Configuração do Projeto
+No painel da Vercel, clique em Add New... > Project e importe o repositório do GitHub.
+
+Defina o Root Directory como frontend se o seu código Next.js não estiver na raiz do repositório.
+
+O Vercel detectará automaticamente o framework como Next.js (Build Command padrão: npm run build ou next build).
+
+### 2.2 Variáveis de Ambiente (Settings > Environment Variables)
+O Next.js exige que as variáveis públicas tenham o prefixo NEXT_PUBLIC_.
+
+⚠️ IMPORTANTE: Se alterar essas variáveis após um deploy, será necessário forçar um Redeploy sem cache para que as novas URLs sejam injetadas no JavaScript.
+
+```
+NEXT_PUBLIC_API_URL = https://nexus-backend-rgvz.onrender.com (Requisições REST)
+
+NEXT_PUBLIC_WS_URL = wss://nexus-backend-rgvz.onrender.com (Requisições de Áudio)
+
+NEXT_PUBLIC_SUPABASE_URL = <Sua Project URL do Supabase>
+
+NEXT_PUBLIC_SUPABASE_ANON_KEY = <Sua Anon Key do Supabase>
+
+(Certifique-se de que não haja barras / no final das URLs para evitar rotas duplicadas como //room/setup).
+```
+
+---
+
 ## 🧪 Testes
 
 ### Backend (pytest)
